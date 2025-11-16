@@ -12,6 +12,7 @@ from app.schemas.auth import (
     KidLogin,
     Token,
     TokenRefresh,
+    LoginResponse
 )
 from app.schemas.parent import ParentResponse
 from app.services.auth_service import AuthService
@@ -41,14 +42,14 @@ def register_parent(
 
 @router.post(
     "/parent/login",
-    response_model=Token,
+    response_model=LoginResponse,
     summary="Parent login",
     description="Authenticate a parent and return JWT tokens."
 )
 def login_parent(
     data: ParentLogin,
     db: Session = Depends(get_db)
-) -> Token:
+) -> LoginResponse:
     """
     Authenticate a parent and return access tokens.
 
@@ -56,19 +57,30 @@ def login_parent(
     """
     parent = AuthService.authenticate_parent(db, data.email, data.password)
     tokens = AuthService.create_tokens_for_parent(parent)
-    return tokens
+    return LoginResponse(
+        user={
+            "id": str(parent.id),
+            "name": parent.name,
+            "email": parent.email,
+            "role": "parent",
+            "parentId": str(parent.id)
+        },
+        access_token=tokens.access_token,
+        refresh_token=tokens.refresh_token,
+        token_type=tokens.token_type
+    )
 
 
 @router.post(
     "/kid/login",
-    response_model=Token,
+    response_model=LoginResponse,
     summary="Kid login",
     description="Authenticate a kid and return JWT tokens."
 )
 def login_kid(
     data: KidLogin,
     db: Session = Depends(get_db)
-) -> Token:
+) -> LoginResponse:
     """
     Authenticate a kid and return access tokens.
 
@@ -76,7 +88,18 @@ def login_kid(
     """
     child = AuthService.authenticate_kid(db, data.username, data.password)
     tokens = AuthService.create_tokens_for_kid(child)
-    return tokens
+    return LoginResponse(
+        user={
+            "id": str(child.id),
+            "name": child.name,
+            "email": child.email,
+            "role": "parent",
+            "parentId": str(child.id)
+        },
+        access_token=tokens.access_token,
+        refresh_token=tokens.refresh_token,
+        token_type=tokens.token_type
+    )
 
 
 @router.post(
