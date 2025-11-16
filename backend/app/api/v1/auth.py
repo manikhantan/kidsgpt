@@ -93,7 +93,7 @@ def login_kid(
             "id": str(child.id),
             "name": child.name,
             "email": child.email,
-            "role": "parent",
+            "role": "child",
             "parentId": str(child.id)
         },
         access_token=tokens.access_token,
