@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
 
-    # Database
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/kidsafe_ai"
+    # Database (required - must be set via environment variable or .env file)
+    DATABASE_URL: str
 
     # JWT Configuration
     SECRET_KEY: str = "your-secret-key-here-change-in-production"
