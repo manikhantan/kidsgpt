@@ -31,7 +31,7 @@ class ContentRule(Base):
         nullable=False
     )
     mode = Column(
-        SQLEnum(ContentRuleMode),
+        SQLEnum(ContentRuleMode, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=ContentRuleMode.BLOCKLIST
     )
