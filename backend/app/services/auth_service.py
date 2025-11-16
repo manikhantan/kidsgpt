@@ -98,15 +98,15 @@ class AuthService:
     @staticmethod
     def authenticate_kid(
         db: Session,
-        username: str,
+        email: str,
         password: str
     ) -> Child:
         """
-        Authenticate a kid with username and password.
+        Authenticate a kid with email and password.
 
         Args:
             db: Database session
-            username: Kid's username
+            email: Kid's email
             password: Plain text password
 
         Returns:
@@ -115,13 +115,13 @@ class AuthService:
         Raises:
             AuthenticationError: If credentials are invalid
         """
-        child = db.query(Child).filter(Child.username == username).first()
+        child = db.query(Child).filter(Child.email == email).first()
 
         if not child:
-            raise AuthenticationError("Invalid username or password")
+            raise AuthenticationError("Invalid email or password")
 
         if not verify_password(password, child.password_hash):
-            raise AuthenticationError("Invalid username or password")
+            raise AuthenticationError("Invalid email or password")
 
         return child
 

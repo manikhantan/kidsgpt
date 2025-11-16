@@ -63,7 +63,7 @@ def login_parent(
             "name": parent.name,
             "email": parent.email,
             "role": "parent",
-            "parentId": str(parent.id)
+            "parentId": str(parent.id),
         },
         access_token=tokens.access_token,
         refresh_token=tokens.refresh_token,
@@ -86,7 +86,7 @@ def login_kid(
 
     Returns access and refresh tokens for authenticated kid.
     """
-    child = AuthService.authenticate_kid(db, data.username, data.password)
+    child = AuthService.authenticate_kid(db, data.email, data.password)
     tokens = AuthService.create_tokens_for_kid(child)
     return LoginResponse(
         user={

@@ -27,11 +27,12 @@ class ParentUpdate(BaseModel):
 class ParentResponse(ParentBase):
     """Schema for parent response."""
     id: UUID
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = Field(..., alias="createdAt")
+    updated_at: datetime = Field(..., alias="updatedAt")
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class ParentAnalytics(BaseModel):
