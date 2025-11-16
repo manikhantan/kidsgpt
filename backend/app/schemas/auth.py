@@ -31,6 +31,14 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class LoginResponse(BaseModel):
+    """Schema for JWT token response."""
+    user: dict
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
 class TokenRefresh(BaseModel):
     """Schema for token refresh request."""
     refresh_token: str
