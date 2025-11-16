@@ -1,7 +1,7 @@
 """
 Child-related schemas for request/response validation.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 from uuid import UUID
 from typing import Optional
@@ -9,7 +9,7 @@ from typing import Optional
 
 class ChildBase(BaseModel):
     """Base child schema."""
-    username: str = Field(..., min_length=3, max_length=50)
+    email: EmailStr
     name: str = Field(..., min_length=1, max_length=100)
 
 

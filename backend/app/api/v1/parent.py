@@ -35,17 +35,17 @@ def create_child(
     """
     Create a new child account.
 
-    Creates a child with username, password, and name linked to the parent.
+    Creates a child with password, and name linked to the parent.
     """
-    # Check if username already exists
-    existing_child = db.query(Child).filter(Child.username == data.username).first()
+    # Check if email already exists
+    existing_child = db.query(Child).filter(Child.email == data.email).first()
     if existing_child:
-        raise ConflictError("Username already taken")
+        raise ConflictError("Email already exists")
 
     # Create child with hashed password
     new_child = Child(
         parent_id=parent.id,
-        username=data.username,
+        email=data.email,
         password_hash=hash_password(data.password),
         name=data.name
     )
