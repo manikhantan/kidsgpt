@@ -49,6 +49,7 @@ class AuthService:
             name=data.name
         )
         db.add(new_parent)
+        db.flush()
 
         # Create default content rules (blocklist mode with common restrictions)
         default_rules = ContentRule(

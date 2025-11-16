@@ -13,6 +13,13 @@ import sys
 # Add the backend directory to the path so we can import our app modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from dotenv import load_dotenv
+import os
+
+# Load .env file explicitly before importing config
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+load_dotenv(env_path)
+
 from app.database import Base
 from app.models import Parent, Child, ContentRule, ChatSession, Message
 from app.config import get_settings

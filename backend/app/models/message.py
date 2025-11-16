@@ -30,7 +30,7 @@ class Message(Base):
         nullable=False,
         index=True
     )
-    role = Column(SQLEnum(MessageRole), nullable=False)
+    role = Column(SQLEnum(MessageRole, values_callable=lambda x: [e.value for e in x]), nullable=False)
     content = Column(Text, nullable=False)
     blocked = Column(Boolean, default=False, nullable=False)
     block_reason = Column(Text, nullable=True)
