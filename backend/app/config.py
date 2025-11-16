@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     # OpenAI Configuration
     OPENAI_API_KEY: str = ""
 
+    # Gemini Configuration
+    GEMINI_API_KEY: str = ""
+
+    # AI Provider Selection (openai, gemini, or auto)
+    AI_PROVIDER: str = "auto"
+
     # CORS Configuration
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
 

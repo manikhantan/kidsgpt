@@ -8,6 +8,11 @@ import logging
 from typing import List, Dict, Any, Optional
 from abc import ABC, abstractmethod
 from openai import OpenAI, APIError, RateLimitError, APIConnectionError
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
 from app.config import get_settings
 from app.core.exceptions import AIServiceError
 
@@ -129,6 +134,85 @@ class OpenAIProvider(AIProvider):
             raise AIServiceError("An unexpected error occurred. Please try again.")
 
 
+class GeminiProvider(AIProvider):
+    """Google Gemini AI provider implementation."""
+
+    def __init__(self):
+        """Initialize Gemini client."""
+        if not settings.GEMINI_API_KEY:
+            logger.warning("Gemini API key not configured")
+        if not GEMINI_AVAILABLE:
+            raise AIServiceError("google-generativeai package not installed. Run: pip install google-generativeai")
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        self.model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=KID_FRIENDLY_SYSTEM_PROMPT
+        )
+
+    def generate_response(
+        self,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> str:
+        """
+        Generate a response using Google Gemini API.
+
+        Args:
+            message: User's current message
+            conversation_history: List of previous messages in format
+                [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+
+        Returns:
+            AI's response text
+
+        Raises:
+            AIServiceError: If API call fails
+        """
+        try:
+            # Build conversation history for Gemini
+            gemini_history = []
+
+            if conversation_history:
+                # Limit history to last 10 exchanges to manage context
+                recent_history = conversation_history[-20:]  # 10 exchanges = 20 messages
+                for msg in recent_history:
+                    # Gemini uses 'model' instead of 'assistant'
+                    role = "model" if msg["role"] == "assistant" else msg["role"]
+                    gemini_history.append({
+                        "role": role,
+                        "parts": [msg["content"]]
+                    })
+
+            # Create chat session with history
+            chat = self.model.start_chat(history=gemini_history)
+
+            # Generate response
+            response = chat.send_message(
+                message,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=500,
+                    temperature=0.7,
+                )
+            )
+
+            return response.text.strip()
+
+        except Exception as e:
+            error_str = str(e).lower()
+            if "quota" in error_str or "rate" in error_str:
+                logger.error(f"Gemini rate limit exceeded: {e}")
+                raise AIServiceError("AI service is temporarily busy. Please try again in a moment.")
+            elif "connection" in error_str or "network" in error_str:
+                logger.error(f"Gemini connection error: {e}")
+                raise AIServiceError("Unable to connect to AI service. Please try again later.")
+            elif "invalid" in error_str and "key" in error_str:
+                logger.error(f"Gemini API key error: {e}")
+                raise AIServiceError("AI service configuration error. Please contact administrator.")
+            else:
+                logger.error(f"Unexpected error in Gemini service: {e}")
+                raise AIServiceError("An unexpected error occurred. Please try again.")
+
+
 class MockAIProvider(AIProvider):
     """Mock AI provider for testing without API calls."""
 
@@ -162,15 +246,57 @@ class AIService:
         Initialize AI service with a provider.
 
         Args:
-            provider: AI provider instance. Defaults to OpenAI provider.
+            provider: AI provider instance. If not provided, selects based on AI_PROVIDER setting.
         """
         if provider:
             self.provider = provider
-        elif settings.OPENAI_API_KEY:
-            self.provider = OpenAIProvider()
         else:
-            logger.warning("No OpenAI API key configured, using mock provider")
-            self.provider = MockAIProvider()
+            self.provider = self._select_provider()
+
+    def _select_provider(self) -> AIProvider:
+        """
+        Select the appropriate AI provider based on configuration.
+
+        Provider selection logic:
+        - If AI_PROVIDER is "openai": Use OpenAI (requires OPENAI_API_KEY)
+        - If AI_PROVIDER is "gemini": Use Gemini (requires GEMINI_API_KEY)
+        - If AI_PROVIDER is "auto" (default): Prefer Gemini if key exists, else OpenAI, else Mock
+
+        Returns:
+            AIProvider instance
+        """
+        provider_setting = settings.AI_PROVIDER.lower()
+
+        if provider_setting == "openai":
+            if settings.OPENAI_API_KEY:
+                logger.info("Using OpenAI provider")
+                return OpenAIProvider()
+            else:
+                logger.warning("OpenAI provider requested but no API key configured, using mock provider")
+                return MockAIProvider()
+
+        elif provider_setting == "gemini":
+            if settings.GEMINI_API_KEY and GEMINI_AVAILABLE:
+                logger.info("Using Gemini provider")
+                return GeminiProvider()
+            elif not GEMINI_AVAILABLE:
+                logger.warning("Gemini provider requested but google-generativeai not installed, using mock provider")
+                return MockAIProvider()
+            else:
+                logger.warning("Gemini provider requested but no API key configured, using mock provider")
+                return MockAIProvider()
+
+        else:  # "auto" or any other value
+            # Auto-select: prefer Gemini, then OpenAI, then Mock
+            if settings.GEMINI_API_KEY and GEMINI_AVAILABLE:
+                logger.info("Auto-selected Gemini provider")
+                return GeminiProvider()
+            elif settings.OPENAI_API_KEY:
+                logger.info("Auto-selected OpenAI provider")
+                return OpenAIProvider()
+            else:
+                logger.warning("No API keys configured, using mock provider")
+                return MockAIProvider()
 
     def get_response(
         self,
