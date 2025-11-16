@@ -27,18 +27,19 @@ class ChildUpdate(BaseModel):
 class ChildResponse(ChildBase):
     """Schema for child response (parent view)."""
     id: UUID
-    parent_id: UUID
-    created_at: datetime
-    updated_at: datetime
+    parent_id: UUID = Field(..., alias="parentId")
+    created_at: datetime = Field(..., alias="createdAt")
+    updated_at: datetime = Field(..., alias="updatedAt")
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class ChildProfile(BaseModel):
     """Schema for child's own profile."""
     id: UUID
-    username: str
+    email: str
     name: str
 
     class Config:

@@ -43,4 +43,4 @@ class Child(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Child(id={self.id}, username={self.username}, name={self.name})>"
+        return f"<Child(id={self.id}, email={self.email}, name={self.name})>"

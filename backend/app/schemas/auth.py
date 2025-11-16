@@ -20,7 +20,7 @@ class ParentLogin(BaseModel):
 
 class KidLogin(BaseModel):
     """Schema for kid login."""
-    username: str = Field(..., min_length=1, max_length=50)
+    email: EmailStr
     password: str
 
 

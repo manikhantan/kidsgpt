@@ -229,7 +229,7 @@ curl -X POST http://localhost:8000/api/parent/children \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_PARENT_ACCESS_TOKEN" \
   -d '{
-    "username": "tommy_kid",
+    "email": "tommy_kid@mgail.com",
     "password": "kidpass123",
     "name": "Tommy"
   }'
@@ -267,7 +267,7 @@ curl -X PUT http://localhost:8000/api/parent/content-rules \
 curl -X POST http://localhost:8000/api/auth/kid/login \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "tommy_kid",
+    "email": "tommy_kid@gmail.com",
     "password": "kidpass123"
   }'
 ```
