@@ -10,11 +10,9 @@ from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from app.api.deps import get_db, get_current_parent, verify_parent_owns_child
-from app.models import Parent, Child, ContentRule, ChatSession, Message, ParentChatSession, ParentMessage, MessageRole
+from app.models import Parent, Child, ContentRule, ParentChatSession, ParentMessage, MessageRole
 from app.schemas.child import ChildCreate, ChildUpdate, ChildResponse
 from app.schemas.content_rule import ContentRuleUpdate, ContentRuleResponse
-from app.schemas.parent import ParentAnalytics
-from app.schemas.message import ChatHistoryResponse, ChatSessionResponse, MessageResponse
 from app.schemas.parent_chat import (
     ParentChatMessageRequest,
     ParentChatResponse,
@@ -27,6 +25,11 @@ from app.schemas.parent_chat import (
 from app.core.security import hash_password
 from app.core.exceptions import NotFoundError, ConflictError
 from app.services.ai_service import get_ai_response, AIService, generate_session_title
+from app.services.insights_service import (
+    get_child_insights_dashboard,
+    process_existing_messages,
+)
+from app.schemas.insights import ChildInsightsDashboard
 
 router = APIRouter(prefix="/parent", tags=["parent"])
 
@@ -201,105 +204,70 @@ def update_content_rules(
     return rules
 
 
+# Parent Insights Dashboard Endpoints
+
 @router.get(
-    "/chat-history/{child_id}",
-    response_model=ChatHistoryResponse,
-    summary="Get child's chat history",
-    description="View complete chat history for a specific child."
+    "/insights/{child_id}",
+    response_model=ChildInsightsDashboard,
+    summary="Get child insights dashboard",
+    description="Get learning insights and analytics for a specific child without accessing actual conversations."
 )
-def get_child_chat_history(
+def get_child_insights(
     child_id: UUID,
     parent: Parent = Depends(get_current_parent),
     db: Session = Depends(get_db)
-) -> ChatHistoryResponse:
+) -> ChildInsightsDashboard:
     """
-    Get complete chat history for a child.
+    Get insights dashboard for a child.
 
-    Returns all chat sessions and messages, including blocked attempts.
+    Returns aggregated insights including:
+    - Top 5 topics of interest with time spent
+    - Learning metrics (why/how questions vs answer-seeking)
+    - Learning streak
+    - Weekly highlights with suggestions
+
+    This endpoint provides insights without exposing actual conversation content.
     """
     # Verify parent owns this child
     child = verify_parent_owns_child(parent, child_id, db)
 
-    # Get all sessions with messages
-    sessions = db.query(ChatSession).filter(
-        ChatSession.child_id == child.id
-    ).order_by(ChatSession.started_at.desc()).all()
+    # Process any unprocessed messages first
+    process_existing_messages(db, child.id)
 
-    # Build response
-    session_responses = []
-    total_messages = 0
-
-    for session in sessions:
-        messages = [MessageResponse.model_validate(msg) for msg in session.messages]
-        total_messages += len(messages)
-
-        session_responses.append(
-            ChatSessionResponse(
-                id=session.id,
-                child_id=session.child_id,
-                started_at=session.started_at,
-                ended_at=session.ended_at,
-                messages=messages
-            )
-        )
-
-    return ChatHistoryResponse(
-        sessions=session_responses,
-        total_sessions=len(sessions),
-        total_messages=total_messages
-    )
+    # Get the insights dashboard
+    return get_child_insights_dashboard(db, child)
 
 
-@router.get(
-    "/analytics/{child_id}",
-    response_model=ParentAnalytics,
-    summary="Get child analytics",
-    description="Get usage analytics for a specific child."
+@router.post(
+    "/insights/{child_id}/refresh",
+    response_model=dict,
+    summary="Refresh child insights",
+    description="Process any new messages and regenerate insights for a child."
 )
-def get_child_analytics(
+def refresh_child_insights(
     child_id: UUID,
     parent: Parent = Depends(get_current_parent),
     db: Session = Depends(get_db)
-) -> ParentAnalytics:
+) -> dict:
     """
-    Get analytics for a child.
+    Refresh insights by processing new messages.
 
-    Returns statistics including total messages, blocked attempts, etc.
+    This endpoint processes any messages that haven't been analyzed yet
+    and updates the aggregated insights.
+
+    Returns:
+        Count of newly processed messages
     """
     # Verify parent owns this child
     child = verify_parent_owns_child(parent, child_id, db)
 
-    # Get total sessions
-    total_sessions = db.query(func.count(ChatSession.id)).filter(
-        ChatSession.child_id == child.id
-    ).scalar()
+    # Process unprocessed messages
+    processed_count = process_existing_messages(db, child.id)
 
-    # Get total messages
-    total_messages = db.query(func.count(Message.id)).join(ChatSession).filter(
-        ChatSession.child_id == child.id
-    ).scalar()
-
-    # Get blocked messages
-    blocked_messages = db.query(func.count(Message.id)).join(ChatSession).filter(
-        ChatSession.child_id == child.id,
-        Message.blocked == True
-    ).scalar()
-
-    # Get last activity
-    last_message = db.query(Message.created_at).join(ChatSession).filter(
-        ChatSession.child_id == child.id
-    ).order_by(Message.created_at.desc()).first()
-
-    last_activity = last_message[0] if last_message else None
-
-    return ParentAnalytics(
-        child_id=child.id,
-        child_name=child.name,
-        total_sessions=total_sessions or 0,
-        total_messages=total_messages or 0,
-        blocked_messages=blocked_messages or 0,
-        last_activity=last_activity
-    )
+    return {
+        "message": f"Successfully processed {processed_count} new messages",
+        "processed_count": processed_count
+    }
 
 
 # Parent Chat Endpoints
