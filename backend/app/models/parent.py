@@ -40,6 +40,11 @@ class Parent(Base):
         uselist=False,  # One-to-one relationship
         cascade="all, delete-orphan"
     )
+    chat_sessions = relationship(
+        "ParentChatSession",
+        back_populates="parent",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Parent(id={self.id}, email={self.email}, name={self.name})>"
