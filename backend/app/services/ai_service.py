@@ -8,11 +8,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from abc import ABC, abstractmethod
 from openai import OpenAI, APIError, RateLimitError, APIConnectionError
-try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
+import google.generativeai as genai
 from app.config import get_settings
 from app.core.exceptions import AIServiceError
 
@@ -141,8 +137,6 @@ class GeminiProvider(AIProvider):
         """Initialize Gemini client."""
         if not settings.GEMINI_API_KEY:
             logger.warning("Gemini API key not configured")
-        if not GEMINI_AVAILABLE:
-            raise AIServiceError("google-generativeai package not installed. Run: pip install google-generativeai")
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self.model = genai.GenerativeModel(
             model_name="gemini-1.5-flash",
@@ -276,19 +270,17 @@ class AIService:
                 return MockAIProvider()
 
         elif provider_setting == "gemini":
-            if settings.GEMINI_API_KEY and GEMINI_AVAILABLE:
+            return MockAIProvider()
+            if settings.GEMINI_API_KEY:
                 logger.info("Using Gemini provider")
                 return GeminiProvider()
-            elif not GEMINI_AVAILABLE:
-                logger.warning("Gemini provider requested but google-generativeai not installed, using mock provider")
-                return MockAIProvider()
             else:
                 logger.warning("Gemini provider requested but no API key configured, using mock provider")
                 return MockAIProvider()
 
         else:  # "auto" or any other value
             # Auto-select: prefer Gemini, then OpenAI, then Mock
-            if settings.GEMINI_API_KEY and GEMINI_AVAILABLE:
+            if settings.GEMINI_API_KEY:
                 logger.info("Auto-selected Gemini provider")
                 return GeminiProvider()
             elif settings.OPENAI_API_KEY:
@@ -369,6 +361,7 @@ Examples of good titles:
 Respond with ONLY the title, nothing else."""
 
         try:
+            print(self.provider)
             # Use a simpler approach - just get a direct response
             if isinstance(self.provider, MockAIProvider):
                 # For mock provider, generate a simple rule-based title
@@ -396,6 +389,7 @@ Respond with ONLY the title, nothing else."""
                 title = response.text.strip()
             else:
                 return self._generate_rule_based_title(user_messages)
+            print('title', title)
 
             # Clean up the title - remove quotes, limit length
             title = title.strip('"\'').strip()
@@ -449,11 +443,7 @@ Respond with ONLY the title, nothing else."""
                 return title
 
         # Default: use first few words of first message
-        first_msg = user_messages[0]
-        words = first_msg.split()[:5]
-        if len(words) > 3:
-            return " ".join(words[:4]) + "..."
-        return "Chat session"
+        return user_messages[0]
 
 
 # Global AI service instance (can be replaced for testing)
