@@ -35,13 +35,16 @@ backend/
 │   │   ├── child.py
 │   │   ├── content_rule.py
 │   │   ├── chat_session.py
-│   │   └── message.py
+│   │   ├── message.py
+│   │   ├── parent_chat_session.py
+│   │   └── parent_message.py
 │   ├── schemas/                # Pydantic schemas
 │   │   ├── auth.py
 │   │   ├── parent.py
 │   │   ├── child.py
 │   │   ├── content_rule.py
-│   │   └── message.py
+│   │   ├── message.py
+│   │   └── parent_chat.py
 │   ├── api/                    # API routes
 │   │   ├── deps.py            # Dependencies (auth, db session)
 │   │   └── v1/
@@ -168,6 +171,11 @@ Once running, access the interactive API documentation:
 - `PUT /api/parent/content-rules` - Update content rules
 - `GET /api/parent/chat-history/{child_id}` - Get child's chat history
 - `GET /api/parent/analytics/{child_id}` - Get child analytics
+- `POST /api/parent/chat` - Send chat message (parent's own chat, no filtering)
+- `GET /api/parent/chat-sessions/recent` - Get recent parent chat sessions
+- `GET /api/parent/chat-sessions` - Get paginated parent chat sessions
+- `GET /api/parent/chat-sessions/{session_id}` - Get full parent chat session
+- `POST /api/parent/chat-sessions` - Create new parent chat session
 
 #### Kid Endpoints (requires kid JWT)
 - `POST /api/kid/chat` - Send chat message (with content filtering)
@@ -270,6 +278,39 @@ curl -X POST http://localhost:8000/api/auth/kid/login \
     "email": "tommy_kid@gmail.com",
     "password": "kidpass123"
   }'
+```
+
+### Parent Send Chat Message
+
+```bash
+curl -X POST http://localhost:8000/api/parent/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_PARENT_ACCESS_TOKEN" \
+  -d '{
+    "message": "How do I set appropriate screen time limits for my child?"
+  }'
+```
+
+Response:
+```json
+{
+  "user_message": {
+    "id": "uuid",
+    "session_id": "uuid",
+    "role": "user",
+    "content": "How do I set appropriate screen time limits for my child?",
+    "created_at": "2024-01-01T00:00:00"
+  },
+  "assistant_message": {
+    "id": "uuid",
+    "session_id": "uuid",
+    "role": "assistant",
+    "content": "Setting appropriate screen time limits depends on your child's age...",
+    "created_at": "2024-01-01T00:00:01"
+  },
+  "session_id": "uuid",
+  "session_title": "Screen Time Limits Discussion"
+}
 ```
 
 ### Kid Send Chat Message

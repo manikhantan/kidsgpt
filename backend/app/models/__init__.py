@@ -8,6 +8,8 @@ from app.models.child import Child
 from app.models.content_rule import ContentRule, ContentRuleMode
 from app.models.chat_session import ChatSession
 from app.models.message import Message, MessageRole
+from app.models.parent_chat_session import ParentChatSession
+from app.models.parent_message import ParentMessage
 
 __all__ = [
     "Parent",
@@ -17,4 +19,6 @@ __all__ = [
     "ChatSession",
     "Message",
     "MessageRole",
+    "ParentChatSession",
+    "ParentMessage",
 ]
