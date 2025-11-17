@@ -338,6 +338,123 @@ class AIService:
                 })
         return history
 
+    def generate_session_title(self, user_messages: List[str]) -> str:
+        """
+        Generate a concise title for a chat session based on user messages.
+
+        Args:
+            user_messages: List of user message contents (first 2-3 messages)
+
+        Returns:
+            A concise title (3-7 words) describing the conversation topic
+        """
+        if not user_messages:
+            return "New Chat"
+
+        # Combine first few user messages for context
+        combined_messages = " ".join(user_messages[:3])
+
+        # Create a prompt for title generation
+        title_prompt = f"""Based on the following user messages from a child, generate a very short, descriptive title (3-7 words) that captures what the conversation is about. The title should be child-friendly and in present continuous or noun form.
+
+Messages: {combined_messages[:500]}
+
+Examples of good titles:
+- Learning about dinosaurs
+- Math homework help
+- Space exploration questions
+- Story about a dragon
+- Drawing tips for beginners
+
+Respond with ONLY the title, nothing else."""
+
+        try:
+            # Use a simpler approach - just get a direct response
+            if isinstance(self.provider, MockAIProvider):
+                # For mock provider, generate a simple rule-based title
+                return self._generate_rule_based_title(user_messages)
+
+            # For real providers, we need to use direct API calls without the system prompt
+            if isinstance(self.provider, OpenAIProvider):
+                response = self.provider.client.chat.completions.create(
+                    model=self.provider.model,
+                    messages=[{"role": "user", "content": title_prompt}],
+                    max_tokens=20,
+                    temperature=0.5
+                )
+                title = response.choices[0].message.content.strip()
+            elif isinstance(self.provider, GeminiProvider):
+                # Create a simple model without system instruction for title generation
+                simple_model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+                response = simple_model.generate_content(
+                    title_prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        max_output_tokens=20,
+                        temperature=0.5,
+                    )
+                )
+                title = response.text.strip()
+            else:
+                return self._generate_rule_based_title(user_messages)
+
+            # Clean up the title - remove quotes, limit length
+            title = title.strip('"\'').strip()
+            words = title.split()
+            if len(words) > 7:
+                title = " ".join(words[:7])
+
+            return title if title else "New Chat"
+
+        except Exception as e:
+            logger.warning(f"Failed to generate AI title, using rule-based: {e}")
+            return self._generate_rule_based_title(user_messages)
+
+    def _generate_rule_based_title(self, user_messages: List[str]) -> str:
+        """
+        Generate a rule-based title from keywords when AI is unavailable.
+
+        Args:
+            user_messages: List of user message contents
+
+        Returns:
+            A simple keyword-based title
+        """
+        if not user_messages:
+            return "New Chat"
+
+        combined_text = " ".join(user_messages[:2]).lower()
+
+        # Common topic keywords
+        topics = {
+            "math": "Math help session",
+            "homework": "Homework assistance",
+            "science": "Science questions",
+            "history": "History exploration",
+            "dinosaur": "Learning about dinosaurs",
+            "space": "Space exploration",
+            "planet": "Planets and astronomy",
+            "story": "Story time",
+            "animal": "Animal facts",
+            "drawing": "Drawing help",
+            "art": "Art and creativity",
+            "game": "Gaming discussion",
+            "book": "Book discussion",
+            "write": "Writing assistance",
+            "spell": "Spelling practice",
+            "read": "Reading help",
+        }
+
+        for keyword, title in topics.items():
+            if keyword in combined_text:
+                return title
+
+        # Default: use first few words of first message
+        first_msg = user_messages[0]
+        words = first_msg.split()[:5]
+        if len(words) > 3:
+            return " ".join(words[:4]) + "..."
+        return "Chat session"
+
 
 # Global AI service instance (can be replaced for testing)
 ai_service = AIService()
@@ -358,3 +475,16 @@ def get_ai_response(
         AI's response text
     """
     return ai_service.get_response(message, conversation_history)
+
+
+def generate_session_title(user_messages: List[str]) -> str:
+    """
+    Convenience function to generate a session title.
+
+    Args:
+        user_messages: List of user message contents
+
+    Returns:
+        Generated title string
+    """
+    return ai_service.generate_session_title(user_messages)
