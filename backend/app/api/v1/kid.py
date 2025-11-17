@@ -157,12 +157,9 @@ def send_chat_message(
     user_messages_in_session = [
         msg.content for msg in session_messages if msg.role == MessageRole.USER
     ]
-    user_messages_in_session.append(data.message)  # Include current message
 
-    if (
-        len(user_messages_in_session) >= 2
-        and (current_session.title == "New Chat" or current_session.title is None)
-    ):
+    # Generate title after first user message if still default
+    if (len(user_messages_in_session) == 1):
         # Generate AI title
         new_title = generate_session_title(user_messages_in_session)
         current_session.title = new_title
