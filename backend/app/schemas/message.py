@@ -11,7 +11,7 @@ from app.models.message import MessageRole
 class ChatMessageRequest(BaseModel):
     """Schema for sending a chat message."""
     message: str = Field(..., min_length=1, max_length=2000)
-    session_id: Optional[UUID] = Field(None, description="Optional session ID to add message to")
+    session_id: Optional[UUID] = Field(None, description="Optional session ID to add message to", alias="sessionId")
 
 
 class MessageResponse(BaseModel):
