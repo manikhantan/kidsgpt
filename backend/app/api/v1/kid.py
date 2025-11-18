@@ -28,7 +28,7 @@ from app.schemas.message import (
 from app.services.content_filter import filter_message
 from app.services.ai_service import get_ai_response, get_ai_response_stream, AIService, generate_session_title
 from app.services.insights_service import process_message_for_insights
-from app.services.youtube_service import get_video_suggestion
+from app.services.youtube_service import get_video_suggestion, get_video_suggestion_sync
 from app.core.exceptions import NotFoundError, AuthorizationError
 
 router = APIRouter(prefix="/kid", tags=["kid"])
@@ -352,8 +352,24 @@ async def send_chat_message_stream(
             except Exception:
                 pass
 
+            # Get YouTube video suggestion (synchronous)
+            video_suggestion = None
+            try:
+                video_suggestion = get_video_suggestion_sync(data.message, full_response)
+            except Exception:
+                pass
+
             # Send done event with message ID
-            yield f"event: done\ndata: {json.dumps({'id': str(assistant_message.id), 'content': full_response, 'session_id': str(current_session.id), 'session_title': session_title})}\n\n"
+            done_data = {
+                'id': str(assistant_message.id),
+                'content': full_response,
+                'session_id': str(current_session.id),
+                'session_title': session_title
+            }
+            if video_suggestion:
+                done_data['video_suggestion'] = video_suggestion
+
+            yield f"event: done\ndata: {json.dumps(done_data)}\n\n"
 
         except Exception as e:
             # Send error event
