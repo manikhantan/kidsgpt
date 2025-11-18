@@ -8,6 +8,7 @@ A production-ready backend API for a kid-safe conversational AI application with
 - **Role-based Access Control** - Separate endpoints and permissions for parents and kids
 - **Content Filtering** - Allowlist or blocklist mode for controlling what topics kids can discuss
 - **AI Chat Integration** - OpenAI-powered chat with kid-friendly system prompts
+- **YouTube Video Suggestions** - Educational video recommendations for kids with every response
 - **Parental Monitoring** - Parents can view complete chat history and analytics
 - **Rate Limiting** - Protection against abuse
 - **Database Migrations** - Alembic for version-controlled schema changes
@@ -109,6 +110,9 @@ SECRET_KEY=your-super-secret-key-change-this-in-production
 
 # OpenAI Configuration
 OPENAI_API_KEY=your-openai-api-key
+
+# YouTube Configuration (for educational video suggestions)
+YOUTUBE_API_KEY=your-youtube-api-key
 
 # CORS (adjust for your frontend URL)
 CORS_ORIGINS=["http://localhost:3000"]
@@ -346,7 +350,16 @@ Response (allowed):
     "created_at": "2024-01-01T00:00:01"
   },
   "was_blocked": false,
-  "block_reason": null
+  "block_reason": null,
+  "session_id": "uuid",
+  "session_title": "Math Homework Help",
+  "video_suggestion": {
+    "video_id": "abc123xyz",
+    "title": "Math Homework Made Easy - Educational Video for Kids",
+    "url": "https://www.youtube.com/watch?v=abc123xyz",
+    "thumbnail_url": "https://i.ytimg.com/vi/abc123xyz/hqdefault.jpg",
+    "channel_title": "Kids Learning Channel"
+  }
 }
 ```
 
@@ -461,6 +474,7 @@ alembic history
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiration | 30 |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token expiration | 7 |
 | `OPENAI_API_KEY` | OpenAI API key | Required for AI |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 key | Optional (for video suggestions) |
 | `CORS_ORIGINS` | Allowed CORS origins | ["http://localhost:3000"] |
 | `DEBUG` | Enable debug mode | False |
 | `RATE_LIMIT_PER_MINUTE` | API rate limit | 60 |

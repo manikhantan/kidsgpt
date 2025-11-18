@@ -20,10 +20,12 @@ from app.schemas.message import (
     PaginatedChatSessions,
     FullChatSession,
     CreateChatSessionResponse,
+    YouTubeVideoSuggestion,
 )
 from app.services.content_filter import filter_message
 from app.services.ai_service import get_ai_response, AIService, generate_session_title
 from app.services.insights_service import process_message_for_insights
+from app.services.youtube_service import get_video_suggestion
 from app.core.exceptions import NotFoundError, AuthorizationError
 
 router = APIRouter(prefix="/kid", tags=["kid"])
@@ -35,7 +37,7 @@ router = APIRouter(prefix="/kid", tags=["kid"])
     summary="Send a chat message",
     description="Send a message to the AI (subject to content filtering)."
 )
-def send_chat_message(
+async def send_chat_message(
     data: ChatMessageRequest,
     kid: Child = Depends(get_current_kid),
     db: Session = Depends(get_db)
@@ -176,13 +178,24 @@ def send_chat_message(
         # Don't fail the chat response if insights processing fails
         pass
 
+    # Get YouTube video suggestion (async, non-blocking)
+    video_suggestion = None
+    try:
+        video_dict = await get_video_suggestion(data.message, ai_response_text)
+        if video_dict:
+            video_suggestion = YouTubeVideoSuggestion(**video_dict)
+    except Exception:
+        # Don't fail the chat response if video suggestion fails
+        pass
+
     return ChatResponse(
         user_message=MessageResponse.model_validate(user_message),
         assistant_message=MessageResponse.model_validate(assistant_message),
         was_blocked=False,
         block_reason=None,
         session_id=current_session.id,
-        session_title=session_title
+        session_title=session_title,
+        video_suggestion=video_suggestion
     )
 
 

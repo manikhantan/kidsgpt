@@ -28,6 +28,15 @@ class MessageResponse(BaseModel):
         from_attributes = True
 
 
+class YouTubeVideoSuggestion(BaseModel):
+    """Schema for a YouTube video suggestion."""
+    video_id: str
+    title: str
+    url: str
+    thumbnail_url: str
+    channel_title: str
+
+
 class ChatResponse(BaseModel):
     """Schema for chat response after sending a message."""
     user_message: MessageResponse
@@ -36,6 +45,7 @@ class ChatResponse(BaseModel):
     block_reason: Optional[str] = None
     session_id: Optional[UUID] = Field(None, description="The session this message belongs to")
     session_title: Optional[str] = Field(None, description="AI-generated title for the session")
+    video_suggestion: Optional[YouTubeVideoSuggestion] = Field(None, description="Educational YouTube video suggestion")
 
 
 class ChatSessionSummary(BaseModel):
