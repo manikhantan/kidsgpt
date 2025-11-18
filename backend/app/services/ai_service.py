@@ -357,6 +357,46 @@ class GeminiProvider(AIProvider):
                 raise AIServiceError("An unexpected error occurred. Please try again.")
 
 
+class MockAIProvider(AIProvider):
+    """Mock AI provider for testing without API calls."""
+
+    def generate_response(
+        self,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> str:
+        """
+        Generate a mock response.
+        Args:
+            message: User's message
+            conversation_history: Previous messages (ignored)
+        Returns:
+            Mock response text
+        """
+        return f"Thank you for your question about: '{message[:50]}...'. I'm here to help you learn and explore safely!"
+
+    def generate_response_stream(
+        self,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Iterator[str]:
+        """
+        Generate a mock streaming response.
+        Args:
+            message: User's message
+            conversation_history: Previous messages (ignored)
+        Yields:
+            Chunks of mock response text
+        """
+        import time
+        response = f"Thank you for your question about: '{message[:50]}...'. I'm here to help you learn and explore safely!"
+        # Simulate streaming by yielding words one at a time
+        words = response.split()
+        for word in words:
+            yield word + " "
+            time.sleep(0.05)  # Small delay to simulate streaming
+
+
 class AIService:
     """
     Main AI service that handles provider selection and response generation.
