@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import UUID
 
 
@@ -36,12 +37,12 @@ def upgrade() -> None:
     op.create_index('ix_parent_chat_sessions_parent_id', 'parent_chat_sessions', ['parent_id'])
     op.create_index('ix_parent_chat_sessions_parent_last_message', 'parent_chat_sessions', ['parent_id', 'last_message_at'])
 
-    # Create parent_messages table
+    # Create parent_messages table (this will auto-create the ENUM)
     op.create_table(
         'parent_messages',
         sa.Column('id', UUID(as_uuid=True), primary_key=True),
         sa.Column('session_id', UUID(as_uuid=True), sa.ForeignKey('parent_chat_sessions.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('role', sa.Enum('user', 'assistant', name='messagerole', create_type=False), nullable=False),
+        sa.Column('role', postgresql.ENUM('user', 'assistant', name='messagerole', create_type=True), nullable=False),
         sa.Column('content', sa.Text(), nullable=False),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
     )
@@ -59,3 +60,6 @@ def downgrade() -> None:
     op.drop_index('ix_parent_chat_sessions_parent_last_message', table_name='parent_chat_sessions')
     op.drop_index('ix_parent_chat_sessions_parent_id', table_name='parent_chat_sessions')
     op.drop_table('parent_chat_sessions')
+
+    # Drop the ENUM type
+    postgresql.ENUM(name='messagerole').drop(op.get_bind(), checkfirst=True)
