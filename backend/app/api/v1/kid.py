@@ -4,6 +4,7 @@ Kid API endpoints.
 Handles chat functionality with content filtering and AI integration.
 """
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_kid
 from app.models import Child, ContentRule, ChatSession, Message, MessageRole
@@ -15,8 +16,10 @@ from app.schemas.message import (
     ChatSessionResponse,
 )
 from app.services.content_filter import filter_message
-from app.services.ai_service import get_ai_response, AIService
+from app.services.ai_service import get_ai_response, get_ai_response_stream, AIService
 from app.core.exceptions import NotFoundError
+import json
+from typing import Iterator
 
 router = APIRouter(prefix="/kid", tags=["kid"])
 
@@ -121,6 +124,126 @@ def send_chat_message(
         assistant_message=MessageResponse.model_validate(assistant_message),
         was_blocked=False,
         block_reason=None
+    )
+
+
+@router.post(
+    "/chat/stream",
+    summary="Send a chat message with streaming response",
+    description="Send a message to the AI and receive a streaming response (subject to content filtering)."
+)
+def send_chat_message_stream(
+    data: ChatMessageRequest,
+    kid: Child = Depends(get_current_kid),
+    db: Session = Depends(get_db)
+) -> StreamingResponse:
+    """
+    Send a chat message to the AI with streaming response.
+
+    This endpoint:
+    1. Validates the kid's JWT token
+    2. Gets parent's content rules
+    3. Filters the message against content rules
+    4. If blocked: returns error event
+    5. If allowed: streams AI response using Server-Sent Events (SSE)
+
+    Returns:
+        StreamingResponse with Server-Sent Events
+    """
+    def generate_stream() -> Iterator[str]:
+        """Generate SSE stream."""
+        try:
+            # Get or create current chat session
+            current_session = _get_or_create_session(kid.id, db)
+
+            # Get parent's content rules
+            content_rules = db.query(ContentRule).filter(
+                ContentRule.parent_id == kid.parent_id
+            ).first()
+
+            if not content_rules:
+                # Send error event
+                yield f"event: error\ndata: {json.dumps({'error': 'Content rules not configured'})}\n\n"
+                return
+
+            # Filter the message against parent's rules
+            is_allowed, block_reason = filter_message(data.message, content_rules)
+
+            if not is_allowed:
+                # Message blocked - save it and send blocked event
+                blocked_message = Message(
+                    session_id=current_session.id,
+                    role=MessageRole.USER,
+                    content=data.message,
+                    blocked=True,
+                    block_reason=block_reason
+                )
+                db.add(blocked_message)
+                db.commit()
+                db.refresh(blocked_message)
+
+                # Send blocked event
+                yield f"event: blocked\ndata: {json.dumps({'block_reason': block_reason, 'message_id': str(blocked_message.id)})}\n\n"
+                return
+
+            # Message allowed - save user message
+            user_message = Message(
+                session_id=current_session.id,
+                role=MessageRole.USER,
+                content=data.message,
+                blocked=False
+            )
+            db.add(user_message)
+            db.commit()
+            db.refresh(user_message)
+
+            # Send user message event
+            yield f"event: user_message\ndata: {json.dumps({'id': str(user_message.id), 'content': data.message})}\n\n"
+
+            # Get conversation history for context
+            session_messages = db.query(Message).filter(
+                Message.session_id == current_session.id,
+                Message.blocked == False
+            ).order_by(Message.created_at.asc()).all()
+
+            # Format history for AI (exclude the current message we just added)
+            conversation_history = AIService.format_history_from_messages(
+                session_messages[:-1]
+            )
+
+            # Stream AI response
+            full_response = ""
+            for chunk in get_ai_response_stream(data.message, conversation_history):
+                full_response += chunk
+                # Send chunk event
+                yield f"event: chunk\ndata: {json.dumps({'content': chunk})}\n\n"
+
+            # Save complete AI response
+            assistant_message = Message(
+                session_id=current_session.id,
+                role=MessageRole.ASSISTANT,
+                content=full_response,
+                blocked=False
+            )
+            db.add(assistant_message)
+            db.commit()
+            db.refresh(assistant_message)
+
+            # Send done event with message ID
+            yield f"event: done\ndata: {json.dumps({'id': str(assistant_message.id), 'content': full_response})}\n\n"
+
+        except Exception as e:
+            # Send error event
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
     )
 
 

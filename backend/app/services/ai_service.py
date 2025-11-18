@@ -5,7 +5,7 @@ This service is designed to be provider-agnostic and can be easily
 extended to support different AI providers.
 """
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterator
 from abc import ABC, abstractmethod
 from openai import OpenAI, APIError, RateLimitError, APIConnectionError
 try:
@@ -56,6 +56,24 @@ class AIProvider(ABC):
 
         Returns:
             AI's response text
+        """
+        pass
+
+    @abstractmethod
+    def generate_response_stream(
+        self,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Iterator[str]:
+        """
+        Generate a streaming response from the AI.
+
+        Args:
+            message: User's message
+            conversation_history: Previous messages in the conversation
+
+        Yields:
+            Chunks of AI's response text
         """
         pass
 
@@ -116,6 +134,72 @@ class OpenAIProvider(AIProvider):
 
             # Extract and return response text
             return response.choices[0].message.content.strip()
+
+        except RateLimitError as e:
+            logger.error(f"OpenAI rate limit exceeded: {e}")
+            raise AIServiceError("AI service is temporarily busy. Please try again in a moment.")
+
+        except APIConnectionError as e:
+            logger.error(f"OpenAI connection error: {e}")
+            raise AIServiceError("Unable to connect to AI service. Please try again later.")
+
+        except APIError as e:
+            logger.error(f"OpenAI API error: {e}")
+            raise AIServiceError("AI service encountered an error. Please try again.")
+
+        except Exception as e:
+            logger.error(f"Unexpected error in AI service: {e}")
+            raise AIServiceError("An unexpected error occurred. Please try again.")
+
+    def generate_response_stream(
+        self,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Iterator[str]:
+        """
+        Generate a streaming response using OpenAI API.
+
+        Args:
+            message: User's current message
+            conversation_history: List of previous messages in format
+                [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+
+        Yields:
+            Chunks of AI's response text
+
+        Raises:
+            AIServiceError: If API call fails
+        """
+        try:
+            # Build messages list with system prompt and history
+            messages = [
+                {"role": "system", "content": KID_FRIENDLY_SYSTEM_PROMPT}
+            ]
+
+            # Add conversation history if provided
+            if conversation_history:
+                # Limit history to last 10 exchanges to manage context
+                recent_history = conversation_history[-20:]  # 10 exchanges = 20 messages
+                messages.extend(recent_history)
+
+            # Add current user message
+            messages.append({"role": "user", "content": message})
+
+            # Make streaming API call
+            stream = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=500,  # Reasonable limit for kid responses
+                temperature=0.7,
+                presence_penalty=0.1,
+                frequency_penalty=0.1,
+                stream=True
+            )
+
+            # Yield response chunks
+            for chunk in stream:
+                if chunk.choices[0].delta.content is not None:
+                    yield chunk.choices[0].delta.content
 
         except RateLimitError as e:
             logger.error(f"OpenAI rate limit exceeded: {e}")
@@ -212,6 +296,73 @@ class GeminiProvider(AIProvider):
                 logger.error(f"Unexpected error in Gemini service: {e}")
                 raise AIServiceError("An unexpected error occurred. Please try again.")
 
+    def generate_response_stream(
+        self,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Iterator[str]:
+        """
+        Generate a streaming response using Google Gemini API.
+
+        Args:
+            message: User's current message
+            conversation_history: List of previous messages in format
+                [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+
+        Yields:
+            Chunks of AI's response text
+
+        Raises:
+            AIServiceError: If API call fails
+        """
+        try:
+            # Build conversation history for Gemini
+            gemini_history = []
+
+            if conversation_history:
+                # Limit history to last 10 exchanges to manage context
+                recent_history = conversation_history[-20:]  # 10 exchanges = 20 messages
+                for msg in recent_history:
+                    # Gemini uses 'model' instead of 'assistant'
+                    role = "model" if msg["role"] == "assistant" else msg["role"]
+                    gemini_history.append({
+                        "role": role,
+                        "parts": [msg["content"]]
+                    })
+
+            # Create chat session with history
+            chat = self.model.start_chat(history=gemini_history)
+
+            # Generate streaming response
+            response = chat.send_message(
+                message,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=500,
+                    temperature=0.7,
+                ),
+                stream=True
+            )
+
+            # Yield response chunks
+            for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+
+        except Exception as e:
+            error_str = str(e).lower()
+            if "quota" in error_str or "rate" in error_str:
+                logger.error(f"Gemini rate limit exceeded: {e}")
+                raise AIServiceError("AI service is temporarily busy. Please try again in a moment.")
+            elif "connection" in error_str or "network" in error_str:
+                logger.error(f"Gemini connection error: {e}")
+                raise AIServiceError("Unable to connect to AI service. Please try again later.")
+            elif "invalid" in error_str and "key" in error_str:
+                logger.error(f"Gemini API key error: {e}")
+                raise AIServiceError("AI service configuration error. Please contact administrator.")
+            else:
+                logger.error(f"Unexpected error in Gemini service: {e}")
+                raise AIServiceError("An unexpected error occurred. Please try again.")
+
 
 class MockAIProvider(AIProvider):
     """Mock AI provider for testing without API calls."""
@@ -232,6 +383,29 @@ class MockAIProvider(AIProvider):
             Mock response text
         """
         return f"Thank you for your question about: '{message[:50]}...'. I'm here to help you learn and explore safely!"
+
+    def generate_response_stream(
+        self,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Iterator[str]:
+        """
+        Generate a mock streaming response.
+
+        Args:
+            message: User's message
+            conversation_history: Previous messages (ignored)
+
+        Yields:
+            Chunks of mock response text
+        """
+        import time
+        response = f"Thank you for your question about: '{message[:50]}...'. I'm here to help you learn and explore safely!"
+        # Simulate streaming by yielding words one at a time
+        words = response.split()
+        for word in words:
+            yield word + " "
+            time.sleep(0.05)  # Small delay to simulate streaming
 
 
 class AIService:
@@ -318,6 +492,26 @@ class AIService:
         """
         return self.provider.generate_response(message, conversation_history)
 
+    def get_response_stream(
+        self,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Iterator[str]:
+        """
+        Get streaming AI response for a message.
+
+        Args:
+            message: User's message
+            conversation_history: Previous messages in conversation
+
+        Yields:
+            Chunks of AI's response text
+
+        Raises:
+            AIServiceError: If response generation fails
+        """
+        return self.provider.generate_response_stream(message, conversation_history)
+
     @staticmethod
     def format_history_from_messages(messages: List[Any]) -> List[Dict[str, str]]:
         """
@@ -358,3 +552,20 @@ def get_ai_response(
         AI's response text
     """
     return ai_service.get_response(message, conversation_history)
+
+
+def get_ai_response_stream(
+    message: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None
+) -> Iterator[str]:
+    """
+    Convenience function to get streaming AI response.
+
+    Args:
+        message: User's message
+        conversation_history: Previous conversation messages
+
+    Yields:
+        Chunks of AI's response text
+    """
+    return ai_service.get_response_stream(message, conversation_history)
