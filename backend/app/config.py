@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # Gemini Configuration
     GEMINI_API_KEY: str = ""
 
+    # YouTube Configuration
+    YOUTUBE_API_KEY: str = ""
+
     # AI Provider Selection (openai, gemini, or auto)
     AI_PROVIDER: str = "auto"
 
