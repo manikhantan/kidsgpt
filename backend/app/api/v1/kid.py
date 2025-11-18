@@ -23,6 +23,7 @@ from app.schemas.message import (
 )
 from app.services.content_filter import filter_message
 from app.services.ai_service import get_ai_response, AIService, generate_session_title
+from app.services.insights_service import process_message_for_insights
 from app.core.exceptions import NotFoundError, AuthorizationError
 
 router = APIRouter(prefix="/kid", tags=["kid"])
@@ -167,6 +168,13 @@ def send_chat_message(
 
     db.commit()
     db.refresh(assistant_message)
+
+    # Process message for insights (async-friendly, non-blocking)
+    try:
+        process_message_for_insights(db, user_message, assistant_message)
+    except Exception:
+        # Don't fail the chat response if insights processing fails
+        pass
 
     return ChatResponse(
         user_message=MessageResponse.model_validate(user_message),
