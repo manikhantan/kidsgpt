@@ -221,8 +221,13 @@ class GeminiProvider(AIProvider):
         """Initialize Gemini client."""
         if not settings.GEMINI_API_KEY:
             logger.warning("Gemini API key not configured")
-        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        
+        # Configure the API key
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        
+        # Create the model
         self.model_name = "gemini-2.0-flash-lite"
+        self.model = genai.GenerativeModel(self.model_name)
 
     def generate_response(
         self,
@@ -245,23 +250,22 @@ class GeminiProvider(AIProvider):
         """
         try:
             # Build contents for Gemini API
-            contents = [KID_FRIENDLY_SYSTEM_PROMPT + "\n\n"]
+            contents = KID_FRIENDLY_SYSTEM_PROMPT + "\n\n"
 
             if conversation_history:
                 # Limit history to last 10 exchanges to manage context
                 recent_history = conversation_history[-20:]  # 10 exchanges = 20 messages
                 for msg in recent_history:
                     role_prefix = "User: " if msg["role"] == "user" else "Assistant: "
-                    contents[0] += role_prefix + msg["content"] + "\n\n"
+                    contents += role_prefix + msg["content"] + "\n\n"
 
             # Add current user message
-            contents[0] += "User: " + message + "\n\nAssistant: "
+            contents += "User: " + message + "\n\nAssistant: "
 
             # Generate response
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=contents,
-                config={
+            response = self.model.generate_content(
+                contents,
+                generation_config={
                     "max_output_tokens": 500,
                     "temperature": 0.7,
                 }
@@ -305,32 +309,37 @@ class GeminiProvider(AIProvider):
         """
         try:
             # Build contents for Gemini API
-            contents = [KID_FRIENDLY_SYSTEM_PROMPT + "\n\n"]
+            contents = KID_FRIENDLY_SYSTEM_PROMPT + "\n\n"
 
             if conversation_history:
                 # Limit history to last 10 exchanges to manage context
                 recent_history = conversation_history[-20:]  # 10 exchanges = 20 messages
                 for msg in recent_history:
                     role_prefix = "User: " if msg["role"] == "user" else "Assistant: "
-                    contents[0] += role_prefix + msg["content"] + "\n\n"
+                    contents += role_prefix + msg["content"] + "\n\n"
 
             # Add current user message
-            contents[0] += "User: " + message + "\n\nAssistant: "
+            contents += "User: " + message + "\n\nAssistant: "
 
             # Generate streaming response
-            response = self.client.models.generate_content_stream(
-                model=self.model_name,
-                contents=contents,
-                config={
+            response = self.model.generate_content(
+                contents,
+                generation_config={
                     "max_output_tokens": 500,
                     "temperature": 0.7,
-                }
+                },
+                stream=True
             )
 
-            # Yield response chunks
+            # Yield response chunks - properly handle the streaming iterator
             for chunk in response:
-                if chunk.text:
+                # Access the text from the chunk's parts
+                if hasattr(chunk, 'text') and chunk.text:
                     yield chunk.text
+                elif hasattr(chunk, 'parts'):
+                    for part in chunk.parts:
+                        if hasattr(part, 'text') and part.text:
+                            yield part.text
 
         except Exception as e:
             error_str = str(e).lower()
@@ -346,50 +355,6 @@ class GeminiProvider(AIProvider):
             else:
                 logger.error(f"Unexpected error in Gemini service: {e}")
                 raise AIServiceError("An unexpected error occurred. Please try again.")
-
-
-class MockAIProvider(AIProvider):
-    """Mock AI provider for testing without API calls."""
-
-    def generate_response(
-        self,
-        message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
-    ) -> str:
-        """
-        Generate a mock response.
-
-        Args:
-            message: User's message
-            conversation_history: Previous messages (ignored)
-
-        Returns:
-            Mock response text
-        """
-        return f"Thank you for your question about: '{message[:50]}...'. I'm here to help you learn and explore safely!"
-
-    def generate_response_stream(
-        self,
-        message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
-    ) -> Iterator[str]:
-        """
-        Generate a mock streaming response.
-
-        Args:
-            message: User's message
-            conversation_history: Previous messages (ignored)
-
-        Yields:
-            Chunks of mock response text
-        """
-        import time
-        response = f"Thank you for your question about: '{message[:50]}...'. I'm here to help you learn and explore safely!"
-        # Simulate streaming by yielding words one at a time
-        words = response.split()
-        for word in words:
-            yield word + " "
-            time.sleep(0.05)  # Small delay to simulate streaming
 
 
 class AIService:
