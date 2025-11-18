@@ -167,7 +167,8 @@ async def send_chat_message(
     # Generate title after first user message if still default
     if (len(user_messages_in_session) == 1):
         # Generate AI title
-        new_title = generate_session_title(user_messages_in_session)
+        # new_title = generate_session_title(user_messages_in_session)
+        new_title = user_messages_in_session[0]
         current_session.title = new_title
         session_title = new_title
 

@@ -222,7 +222,7 @@ class GeminiProvider(AIProvider):
         if not settings.GEMINI_API_KEY:
             logger.warning("Gemini API key not configured")
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        self.model_name = "gemini-2.0-flash"
+        self.model_name = "gemini-2.0-flash-lite"
 
     def generate_response(
         self,
