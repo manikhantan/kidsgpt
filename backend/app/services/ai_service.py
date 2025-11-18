@@ -221,12 +221,12 @@ class GeminiProvider(AIProvider):
         """Initialize Gemini client."""
         if not settings.GEMINI_API_KEY:
             logger.warning("Gemini API key not configured")
-        
+
         # Configure the API key
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        
+
         # Create the model
-        self.model_name = "gemini-2.0-flash-lite"
+        self.model_name = "gemini-2.5-flash-lite"
         self.model = genai.GenerativeModel(self.model_name)
 
     def generate_response(
@@ -567,7 +567,7 @@ Respond with ONLY the title, nothing else."""
             elif isinstance(self.provider, GeminiProvider):
                 # Use the new client API for title generation
                 response = self.provider.client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model="gemini-2.5-flash-lite",
                     contents=[title_prompt],
                     config={
                         "max_output_tokens": 20,
