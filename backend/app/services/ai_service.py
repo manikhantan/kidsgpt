@@ -270,7 +270,6 @@ class AIService:
                 return MockAIProvider()
 
         elif provider_setting == "gemini":
-            return MockAIProvider()
             if settings.GEMINI_API_KEY:
                 logger.info("Using Gemini provider")
                 return GeminiProvider()
