@@ -221,11 +221,8 @@ class GeminiProvider(AIProvider):
         """Initialize Gemini client."""
         if not settings.GEMINI_API_KEY:
             logger.warning("Gemini API key not configured")
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
-            system_instruction=KID_FRIENDLY_SYSTEM_PROMPT
-        )
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.model_name = "gemini-2.0-flash"
 
     def generate_response(
         self,
@@ -247,30 +244,27 @@ class GeminiProvider(AIProvider):
             AIServiceError: If API call fails
         """
         try:
-            # Build conversation history for Gemini
-            gemini_history = []
+            # Build contents for Gemini API
+            contents = [KID_FRIENDLY_SYSTEM_PROMPT + "\n\n"]
 
             if conversation_history:
                 # Limit history to last 10 exchanges to manage context
                 recent_history = conversation_history[-20:]  # 10 exchanges = 20 messages
                 for msg in recent_history:
-                    # Gemini uses 'model' instead of 'assistant'
-                    role = "model" if msg["role"] == "assistant" else msg["role"]
-                    gemini_history.append({
-                        "role": role,
-                        "parts": [msg["content"]]
-                    })
+                    role_prefix = "User: " if msg["role"] == "user" else "Assistant: "
+                    contents[0] += role_prefix + msg["content"] + "\n\n"
 
-            # Create chat session with history
-            chat = self.model.start_chat(history=gemini_history)
+            # Add current user message
+            contents[0] += "User: " + message + "\n\nAssistant: "
 
             # Generate response
-            response = chat.send_message(
-                message,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=500,
-                    temperature=0.7,
-                )
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                config={
+                    "max_output_tokens": 500,
+                    "temperature": 0.7,
+                }
             )
 
             return response.text.strip()
@@ -310,31 +304,27 @@ class GeminiProvider(AIProvider):
             AIServiceError: If API call fails
         """
         try:
-            # Build conversation history for Gemini
-            gemini_history = []
+            # Build contents for Gemini API
+            contents = [KID_FRIENDLY_SYSTEM_PROMPT + "\n\n"]
 
             if conversation_history:
                 # Limit history to last 10 exchanges to manage context
                 recent_history = conversation_history[-20:]  # 10 exchanges = 20 messages
                 for msg in recent_history:
-                    # Gemini uses 'model' instead of 'assistant'
-                    role = "model" if msg["role"] == "assistant" else msg["role"]
-                    gemini_history.append({
-                        "role": role,
-                        "parts": [msg["content"]]
-                    })
+                    role_prefix = "User: " if msg["role"] == "user" else "Assistant: "
+                    contents[0] += role_prefix + msg["content"] + "\n\n"
 
-            # Create chat session with history
-            chat = self.model.start_chat(history=gemini_history)
+            # Add current user message
+            contents[0] += "User: " + message + "\n\nAssistant: "
 
             # Generate streaming response
-            response = chat.send_message(
-                message,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=500,
-                    temperature=0.7,
-                ),
-                stream=True
+            response = self.client.models.generate_content_stream(
+                model=self.model_name,
+                contents=contents,
+                config={
+                    "max_output_tokens": 500,
+                    "temperature": 0.7,
+                }
             )
 
             # Yield response chunks
@@ -570,14 +560,14 @@ Respond with ONLY the title, nothing else."""
                 )
                 title = response.choices[0].message.content.strip()
             elif isinstance(self.provider, GeminiProvider):
-                # Create a simple model without system instruction for title generation
-                simple_model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-                response = simple_model.generate_content(
-                    title_prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        max_output_tokens=20,
-                        temperature=0.5,
-                    )
+                # Use the new client API for title generation
+                response = self.provider.client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=[title_prompt],
+                    config={
+                        "max_output_tokens": 20,
+                        "temperature": 0.5,
+                    }
                 )
                 title = response.text.strip()
             else:
