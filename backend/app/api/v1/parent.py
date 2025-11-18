@@ -4,9 +4,11 @@ Parent API endpoints.
 Handles child management, content rules, monitoring features, and parent chat.
 """
 from datetime import datetime
-from typing import List
+from typing import List, Iterator
 from uuid import UUID
+import json
 from fastapi import APIRouter, Depends, status, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from app.api.deps import get_db, get_current_parent, verify_parent_owns_child
@@ -24,7 +26,7 @@ from app.schemas.parent_chat import (
 )
 from app.core.security import hash_password
 from app.core.exceptions import NotFoundError, ConflictError
-from app.services.ai_service import get_ai_response, AIService, generate_session_title
+from app.services.ai_service import get_ai_response, get_ai_response_stream, AIService, generate_session_title
 from app.services.insights_service import (
     get_child_insights_dashboard,
     process_existing_messages,
@@ -371,6 +373,125 @@ def send_parent_chat_message(
         assistant_message=ParentMessageResponse.model_validate(assistant_message),
         session_id=current_session.id,
         session_title=session_title
+    )
+
+
+@router.post(
+    "/chat/stream",
+    summary="Send a chat message with streaming response",
+    description="Send a message to the AI and receive a streaming response (no content filtering for parents)."
+)
+async def send_parent_chat_message_stream(
+    data: ParentChatMessageRequest,
+    parent: Parent = Depends(get_current_parent),
+    db: Session = Depends(get_db)
+) -> StreamingResponse:
+    """
+    Send a chat message to the AI with streaming response.
+
+    This endpoint:
+    1. Validates the parent's JWT token
+    2. Gets or creates chat session
+    3. Streams AI response using Server-Sent Events (SSE)
+    4. No content filtering applied for parents
+
+    Returns:
+        StreamingResponse with Server-Sent Events
+    """
+    def generate_stream() -> Iterator[str]:
+        """Generate SSE stream."""
+        try:
+            # Get or create chat session
+            if data.session_id:
+                # Verify session belongs to this parent
+                current_session = db.query(ParentChatSession).filter(
+                    ParentChatSession.id == data.session_id,
+                    ParentChatSession.parent_id == parent.id
+                ).first()
+                if not current_session:
+                    yield f"event: error\ndata: {json.dumps({'error': 'Chat session not found or does not belong to you'})}\n\n"
+                    return
+            else:
+                # Create a new session
+                current_session = ParentChatSession(
+                    parent_id=parent.id,
+                    title="New Chat",
+                    last_message_at=datetime.utcnow(),
+                    message_count=0
+                )
+                db.add(current_session)
+                db.commit()
+                db.refresh(current_session)
+
+            # Save user message (no content filtering for parents)
+            user_message = ParentMessage(
+                session_id=current_session.id,
+                role=MessageRole.USER,
+                content=data.message
+            )
+            db.add(user_message)
+            db.commit()
+            db.refresh(user_message)
+
+            # Send user message event
+            yield f"event: user_message\ndata: {json.dumps({'id': str(user_message.id), 'content': data.message, 'session_id': str(current_session.id)})}\n\n"
+
+            # Get conversation history for context
+            session_messages = db.query(ParentMessage).filter(
+                ParentMessage.session_id == current_session.id
+            ).order_by(ParentMessage.created_at.asc()).all()
+
+            # Format history for AI (exclude the current message we just added)
+            conversation_history = _format_parent_history(session_messages[:-1])
+
+            # Stream AI response
+            full_response = ""
+            for chunk in get_ai_response_stream(data.message, conversation_history):
+                full_response += chunk
+                # Send chunk event
+                yield f"event: chunk\ndata: {json.dumps({'content': chunk})}\n\n"
+
+            # Save complete AI response
+            assistant_message = ParentMessage(
+                session_id=current_session.id,
+                role=MessageRole.ASSISTANT,
+                content=full_response
+            )
+            db.add(assistant_message)
+
+            # Update session metadata
+            current_session.last_message_at = datetime.utcnow()
+            current_session.message_count += 2  # Both user and assistant messages
+
+            # Generate title after first user message if still default
+            session_title = current_session.title
+            user_messages_in_session = [
+                msg.content for msg in session_messages if msg.role == MessageRole.USER
+            ]
+
+            if len(user_messages_in_session) == 1:
+                new_title = generate_session_title(user_messages_in_session)
+                current_session.title = new_title
+                session_title = new_title
+
+            db.commit()
+            db.refresh(assistant_message)
+
+            # Send done event with message ID
+            yield f"event: done\ndata: {json.dumps({'id': str(assistant_message.id), 'content': full_response, 'session_id': str(current_session.id), 'session_title': session_title})}\n\n"
+
+        except Exception as e:
+            # Send error event
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
     )
 
 
