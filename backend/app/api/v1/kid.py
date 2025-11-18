@@ -5,7 +5,10 @@ Handles chat functionality with content filtering and AI integration.
 """
 from datetime import datetime
 from uuid import UUID
+from typing import Iterator
+import json
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.api.deps import get_db, get_current_kid
@@ -23,7 +26,7 @@ from app.schemas.message import (
     YouTubeVideoSuggestion,
 )
 from app.services.content_filter import filter_message
-from app.services.ai_service import get_ai_response, AIService, generate_session_title
+from app.services.ai_service import get_ai_response, get_ai_response_stream, AIService, generate_session_title
 from app.services.insights_service import process_message_for_insights
 from app.services.youtube_service import get_video_suggestion
 from app.core.exceptions import NotFoundError, AuthorizationError
@@ -196,6 +199,173 @@ async def send_chat_message(
         session_id=current_session.id,
         session_title=session_title,
         video_suggestion=video_suggestion
+    )
+
+
+@router.post(
+    "/chat/stream",
+    summary="Send a chat message with streaming response",
+    description="Send a message to the AI and receive a streaming response (subject to content filtering)."
+)
+async def send_chat_message_stream(
+    data: ChatMessageRequest,
+    kid: Child = Depends(get_current_kid),
+    db: Session = Depends(get_db)
+) -> StreamingResponse:
+    """
+    Send a chat message to the AI with streaming response.
+
+    This endpoint:
+    1. Validates the kid's JWT token
+    2. Gets or creates chat session
+    3. Gets parent's content rules
+    4. Filters the message against content rules
+    5. If blocked: returns error event
+    6. If allowed: streams AI response using Server-Sent Events (SSE)
+
+    Returns:
+        StreamingResponse with Server-Sent Events
+    """
+    def generate_stream() -> Iterator[str]:
+        """Generate SSE stream."""
+        try:
+            # Get or create chat session
+            if data.session_id:
+                # Verify session belongs to this kid
+                current_session = db.query(ChatSession).filter(
+                    ChatSession.id == data.session_id,
+                    ChatSession.child_id == kid.id
+                ).first()
+                if not current_session:
+                    yield f"event: error\ndata: {json.dumps({'error': 'Chat session not found or does not belong to you'})}\n\n"
+                    return
+            else:
+                # Create a new session
+                current_session = ChatSession(
+                    child_id=kid.id,
+                    title="New Chat",
+                    last_message_at=datetime.utcnow(),
+                    message_count=0
+                )
+                db.add(current_session)
+                db.commit()
+                db.refresh(current_session)
+
+            # Get parent's content rules
+            content_rules = db.query(ContentRule).filter(
+                ContentRule.parent_id == kid.parent_id
+            ).first()
+
+            if not content_rules:
+                # Send error event
+                yield f"event: error\ndata: {json.dumps({'error': 'Content rules not configured'})}\n\n"
+                return
+
+            # Filter the message against parent's rules
+            is_allowed, block_reason = filter_message(data.message, content_rules)
+
+            if not is_allowed:
+                # Message blocked - save it and send blocked event
+                blocked_message = Message(
+                    session_id=current_session.id,
+                    role=MessageRole.USER,
+                    content=data.message,
+                    blocked=True,
+                    block_reason=block_reason
+                )
+                db.add(blocked_message)
+
+                # Update session metadata
+                current_session.last_message_at = datetime.utcnow()
+                current_session.message_count += 1
+
+                db.commit()
+                db.refresh(blocked_message)
+
+                # Send blocked event
+                yield f"event: blocked\ndata: {json.dumps({'block_reason': block_reason, 'message_id': str(blocked_message.id), 'session_id': str(current_session.id), 'session_title': current_session.title})}\n\n"
+                return
+
+            # Message allowed - save user message
+            user_message = Message(
+                session_id=current_session.id,
+                role=MessageRole.USER,
+                content=data.message,
+                blocked=False
+            )
+            db.add(user_message)
+            db.commit()
+            db.refresh(user_message)
+
+            # Send user message event
+            yield f"event: user_message\ndata: {json.dumps({'id': str(user_message.id), 'content': data.message, 'session_id': str(current_session.id)})}\n\n"
+
+            # Get conversation history for context
+            session_messages = db.query(Message).filter(
+                Message.session_id == current_session.id,
+                Message.blocked == False
+            ).order_by(Message.created_at.asc()).all()
+
+            # Format history for AI (exclude the current message we just added)
+            conversation_history = AIService.format_history_from_messages(
+                session_messages[:-1]
+            )
+
+            # Stream AI response
+            full_response = ""
+            for chunk in get_ai_response_stream(data.message, conversation_history):
+                full_response += chunk
+                # Send chunk event
+                yield f"event: chunk\ndata: {json.dumps({'content': chunk})}\n\n"
+
+            # Save complete AI response
+            assistant_message = Message(
+                session_id=current_session.id,
+                role=MessageRole.ASSISTANT,
+                content=full_response,
+                blocked=False
+            )
+            db.add(assistant_message)
+
+            # Update session metadata
+            current_session.last_message_at = datetime.utcnow()
+            current_session.message_count += 2  # Both user and assistant messages
+
+            # Generate title after first user message if still default
+            session_title = current_session.title
+            user_messages_in_session = [
+                msg.content for msg in session_messages if msg.role == MessageRole.USER
+            ]
+
+            if len(user_messages_in_session) == 1:
+                new_title = generate_session_title(user_messages_in_session)
+                current_session.title = new_title
+                session_title = new_title
+
+            db.commit()
+            db.refresh(assistant_message)
+
+            # Process message for insights (non-blocking)
+            try:
+                process_message_for_insights(db, user_message, assistant_message)
+            except Exception:
+                pass
+
+            # Send done event with message ID
+            yield f"event: done\ndata: {json.dumps({'id': str(assistant_message.id), 'content': full_response, 'session_id': str(current_session.id), 'session_title': session_title})}\n\n"
+
+        except Exception as e:
+            # Send error event
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
     )
 
 
