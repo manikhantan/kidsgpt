@@ -1,7 +1,7 @@
 """Add insights tracking tables for parent dashboard.
 
-Revision ID: 005_add_insights_tables
-Revises: 004_add_role_column_to_messages
+Revision ID: 005
+Revises: 004
 Create Date: 2025-01-17
 """
 from typing import Sequence, Union
@@ -11,8 +11,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '005_add_insights_tables'
-down_revision: Union[str, None] = '004_add_role_column_to_messages'
+revision: str = '005'
+down_revision: Union[str, None] = '004'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
