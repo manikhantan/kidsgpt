@@ -41,7 +41,8 @@ class AIProvider(ABC):
     def generate_response(
         self,
         message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        custom_system_prompt: Optional[str] = None
     ) -> str:
         """
         Generate a response from the AI.
@@ -49,6 +50,7 @@ class AIProvider(ABC):
         Args:
             message: User's message
             conversation_history: Previous messages in the conversation
+            custom_system_prompt: Optional custom system prompt to override default
 
         Returns:
             AI's response text
@@ -59,7 +61,8 @@ class AIProvider(ABC):
     def generate_response_stream(
         self,
         message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        custom_system_prompt: Optional[str] = None
     ) -> Iterator[str]:
         """
         Generate a streaming response from the AI.
@@ -67,6 +70,7 @@ class AIProvider(ABC):
         Args:
             message: User's message
             conversation_history: Previous messages in the conversation
+            custom_system_prompt: Optional custom system prompt to override default
 
         Yields:
             Chunks of AI's response text
@@ -87,7 +91,8 @@ class OpenAIProvider(AIProvider):
     def generate_response(
         self,
         message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        custom_system_prompt: Optional[str] = None
     ) -> str:
         """
         Generate a response using OpenAI API.
@@ -96,6 +101,7 @@ class OpenAIProvider(AIProvider):
             message: User's current message
             conversation_history: List of previous messages in format
                 [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+            custom_system_prompt: Optional custom system prompt to override default
 
         Returns:
             AI's response text
@@ -105,8 +111,9 @@ class OpenAIProvider(AIProvider):
         """
         try:
             # Build messages list with system prompt and history
+            system_prompt = custom_system_prompt or KID_FRIENDLY_SYSTEM_PROMPT
             messages = [
-                {"role": "system", "content": KID_FRIENDLY_SYSTEM_PROMPT}
+                {"role": "system", "content": system_prompt}
             ]
 
             # Add conversation history if provided
@@ -150,7 +157,8 @@ class OpenAIProvider(AIProvider):
     def generate_response_stream(
         self,
         message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        custom_system_prompt: Optional[str] = None
     ) -> Iterator[str]:
         """
         Generate a streaming response using OpenAI API.
@@ -159,6 +167,7 @@ class OpenAIProvider(AIProvider):
             message: User's current message
             conversation_history: List of previous messages in format
                 [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+            custom_system_prompt: Optional custom system prompt to override default
 
         Yields:
             Chunks of AI's response text
@@ -168,8 +177,9 @@ class OpenAIProvider(AIProvider):
         """
         try:
             # Build messages list with system prompt and history
+            system_prompt = custom_system_prompt or KID_FRIENDLY_SYSTEM_PROMPT
             messages = [
-                {"role": "system", "content": KID_FRIENDLY_SYSTEM_PROMPT}
+                {"role": "system", "content": system_prompt}
             ]
 
             # Add conversation history if provided
@@ -232,7 +242,8 @@ class GeminiProvider(AIProvider):
     def generate_response(
         self,
         message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        custom_system_prompt: Optional[str] = None
     ) -> str:
         """
         Generate a response using Google Gemini API.
@@ -241,6 +252,7 @@ class GeminiProvider(AIProvider):
             message: User's current message
             conversation_history: List of previous messages in format
                 [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+            custom_system_prompt: Optional custom system prompt to override default
 
         Returns:
             AI's response text
@@ -250,7 +262,8 @@ class GeminiProvider(AIProvider):
         """
         try:
             # Build contents for Gemini API
-            contents = KID_FRIENDLY_SYSTEM_PROMPT + "\n\n"
+            system_prompt = custom_system_prompt or KID_FRIENDLY_SYSTEM_PROMPT
+            contents = system_prompt + "\n\n"
 
             if conversation_history:
                 # Limit history to last 10 exchanges to manage context
@@ -291,7 +304,8 @@ class GeminiProvider(AIProvider):
     def generate_response_stream(
         self,
         message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        custom_system_prompt: Optional[str] = None
     ) -> Iterator[str]:
         """
         Generate a streaming response using Google Gemini API.
@@ -300,6 +314,7 @@ class GeminiProvider(AIProvider):
             message: User's current message
             conversation_history: List of previous messages in format
                 [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+            custom_system_prompt: Optional custom system prompt to override default
 
         Yields:
             Chunks of AI's response text
@@ -309,7 +324,8 @@ class GeminiProvider(AIProvider):
         """
         try:
             # Build contents for Gemini API
-            contents = KID_FRIENDLY_SYSTEM_PROMPT + "\n\n"
+            system_prompt = custom_system_prompt or KID_FRIENDLY_SYSTEM_PROMPT
+            contents = system_prompt + "\n\n"
 
             if conversation_history:
                 # Limit history to last 10 exchanges to manage context
@@ -363,13 +379,15 @@ class MockAIProvider(AIProvider):
     def generate_response(
         self,
         message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        custom_system_prompt: Optional[str] = None
     ) -> str:
         """
         Generate a mock response.
         Args:
             message: User's message
             conversation_history: Previous messages (ignored)
+            custom_system_prompt: Custom system prompt (ignored)
         Returns:
             Mock response text
         """
@@ -378,13 +396,15 @@ class MockAIProvider(AIProvider):
     def generate_response_stream(
         self,
         message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        custom_system_prompt: Optional[str] = None
     ) -> Iterator[str]:
         """
         Generate a mock streaming response.
         Args:
             message: User's message
             conversation_history: Previous messages (ignored)
+            custom_system_prompt: Custom system prompt (ignored)
         Yields:
             Chunks of mock response text
         """
@@ -461,7 +481,8 @@ class AIService:
     def get_response(
         self,
         message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        custom_system_prompt: Optional[str] = None
     ) -> str:
         """
         Get AI response for a message.
@@ -469,6 +490,7 @@ class AIService:
         Args:
             message: User's message
             conversation_history: Previous messages in conversation
+            custom_system_prompt: Optional custom system prompt to override default
 
         Returns:
             AI's response text
@@ -476,12 +498,13 @@ class AIService:
         Raises:
             AIServiceError: If response generation fails
         """
-        return self.provider.generate_response(message, conversation_history)
+        return self.provider.generate_response(message, conversation_history, custom_system_prompt)
 
     def get_response_stream(
         self,
         message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        custom_system_prompt: Optional[str] = None
     ) -> Iterator[str]:
         """
         Get streaming AI response for a message.
@@ -489,6 +512,7 @@ class AIService:
         Args:
             message: User's message
             conversation_history: Previous messages in conversation
+            custom_system_prompt: Optional custom system prompt to override default
 
         Yields:
             Chunks of AI's response text
@@ -496,7 +520,7 @@ class AIService:
         Raises:
             AIServiceError: If response generation fails
         """
-        return self.provider.generate_response_stream(message, conversation_history)
+        return self.provider.generate_response_stream(message, conversation_history, custom_system_prompt)
 
     @staticmethod
     def format_history_from_messages(messages: List[Any]) -> List[Dict[str, str]]:
@@ -640,7 +664,8 @@ ai_service = AIService()
 
 def get_ai_response(
     message: str,
-    conversation_history: Optional[List[Dict[str, str]]] = None
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    custom_system_prompt: Optional[str] = None
 ) -> str:
     """
     Convenience function to get AI response.
@@ -648,16 +673,18 @@ def get_ai_response(
     Args:
         message: User's message
         conversation_history: Previous conversation messages
+        custom_system_prompt: Optional custom system prompt to override default
 
     Returns:
         AI's response text
     """
-    return ai_service.get_response(message, conversation_history)
+    return ai_service.get_response(message, conversation_history, custom_system_prompt)
 
 
 def get_ai_response_stream(
     message: str,
-    conversation_history: Optional[List[Dict[str, str]]] = None
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    custom_system_prompt: Optional[str] = None
 ) -> Iterator[str]:
     """
     Convenience function to get streaming AI response.
@@ -665,11 +692,12 @@ def get_ai_response_stream(
     Args:
         message: User's message
         conversation_history: Previous conversation messages
+        custom_system_prompt: Optional custom system prompt to override default
 
     Yields:
         Chunks of AI's response text
     """
-    return ai_service.get_response_stream(message, conversation_history)
+    return ai_service.get_response_stream(message, conversation_history, custom_system_prompt)
 
 
 def generate_session_title(user_messages: List[str]) -> str:

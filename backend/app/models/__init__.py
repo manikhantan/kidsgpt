@@ -13,6 +13,9 @@ from app.models.parent_message import ParentMessage
 from app.models.message_insight import MessageInsight
 from app.models.child_topic_summary import ChildTopicSummary
 from app.models.child_weekly_insights import ChildWeeklyInsights
+from app.models.future_identity import FutureIdentity
+from app.models.timeline_event import TimelineEvent
+from app.models.future_slip import FutureSlip, FutureSlipType
 
 __all__ = [
     "Parent",
@@ -27,4 +30,8 @@ __all__ = [
     "MessageInsight",
     "ChildTopicSummary",
     "ChildWeeklyInsights",
+    "FutureIdentity",
+    "TimelineEvent",
+    "FutureSlip",
+    "FutureSlipType",
 ]
