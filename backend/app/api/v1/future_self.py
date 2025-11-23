@@ -114,7 +114,7 @@ async def create_future_identity(
 
 
 @router.get(
-    "/timeline-status",
+    "/timeline/status",
     response_model=TimelineStatusResponse,
     summary="Get user's timeline status",
     description="Retrieve current timeline metrics including compression, thinking age, and trajectory."
@@ -222,12 +222,12 @@ async def create_compression_event(
 
 
 @router.get(
-    "/achievements/revealed",
+    "/achievements",
     response_model=RevealedAchievementsResponse,
     summary="Get all revealed achievements",
     description="Retrieve all future slips that have been accidentally revealed."
 )
-async def get_revealed_achievements(
+async def get_achievements(
     kid: Child = Depends(get_current_kid),
     db: Session = Depends(get_db)
 ) -> RevealedAchievementsResponse:
@@ -262,6 +262,51 @@ async def get_revealed_achievements(
     ]
 
     return RevealedAchievementsResponse(achievements=achievements)
+
+
+@router.get(
+    "/timeline/milestones",
+    response_model=list,
+    summary="Get recent timeline milestones",
+    description="Retrieve recent learning acceleration events/milestones."
+)
+async def get_timeline_milestones(
+    limit: int = Query(20, ge=1, le=100),
+    kid: Child = Depends(get_current_kid),
+    db: Session = Depends(get_db)
+):
+    """
+    Get recent timeline milestones.
+
+    Returns recent timeline events showing learning accelerations.
+    """
+    future_identity = db.query(FutureIdentity).filter(
+        FutureIdentity.child_id == kid.id
+    ).first()
+
+    if not future_identity:
+        return []
+
+    # Get recent timeline events
+    events = db.query(TimelineEvent).filter(
+        TimelineEvent.future_identity_id == future_identity.id
+    ).order_by(desc(TimelineEvent.created_at)).limit(limit).all()
+
+    milestones = [
+        {
+            "id": str(event.id),
+            "concept": event.concept_learned,
+            "yearsSaved": event.years_compressed,
+            "complexityScore": event.complexity_score,
+            "normalLearningAge": event.normal_learning_age,
+            "actualAge": event.actual_age,
+            "context": event.context,
+            "createdAt": event.created_at.isoformat()
+        }
+        for event in events
+    ]
+
+    return milestones
 
 
 @router.post(
