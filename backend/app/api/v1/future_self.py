@@ -7,7 +7,7 @@ from datetime import datetime
 from uuid import UUID
 from typing import Optional
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.api.deps import get_db, get_current_kid
