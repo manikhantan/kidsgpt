@@ -53,7 +53,19 @@ async def get_future_identity(
     if not future_identity:
         raise NotFoundError("Future identity not found. Set up your future profile first.")
 
-    return future_identity
+    return FutureIdentityResponse(
+        id=future_identity.id,
+        child_id=future_identity.child_id,
+        future_identity=future_identity.future_identity,
+        breakthrough_age=future_identity.breakthrough_age,
+        first_ambition=future_identity.first_ambition,
+        timeline_compression=future_identity.timeline_compression,
+        thinking_age=future_identity.thinking_age,
+        current_age=future_identity.current_age,
+        trajectory=future_identity.trajectory,
+        created_at=future_identity.created_at,
+        updated_at=future_identity.updated_at
+    )
 
 
 @router.post(
@@ -110,7 +122,19 @@ async def create_future_identity(
 
     logger.info(f"Created future identity for child {kid.id}: {data.future_identity}")
 
-    return future_identity
+    return FutureIdentityResponse(
+        id=future_identity.id,
+        child_id=future_identity.child_id,
+        future_identity=future_identity.future_identity,
+        breakthrough_age=future_identity.breakthrough_age,
+        first_ambition=future_identity.first_ambition,
+        timeline_compression=future_identity.timeline_compression,
+        thinking_age=future_identity.thinking_age,
+        current_age=future_identity.current_age,
+        trajectory=future_identity.trajectory,
+        created_at=future_identity.created_at,
+        updated_at=future_identity.updated_at
+    )
 
 
 @router.get(
@@ -218,7 +242,17 @@ async def create_compression_event(
 
     logger.info(f"Created compression event for child {kid.id}: {data.concept_learned} ({data.years_compressed} years)")
 
-    return event
+    return CompressionEventResponse(
+        id=event.id,
+        future_identity_id=event.future_identity_id,
+        concept_learned=event.concept_learned,
+        normal_learning_age=event.normal_learning_age,
+        actual_age=event.actual_age,
+        years_compressed=event.years_compressed,
+        complexity_score=event.complexity_score,
+        context=event.context,
+        created_at=event.created_at
+    )
 
 
 @router.get(

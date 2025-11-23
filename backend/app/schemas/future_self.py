@@ -32,7 +32,6 @@ class FutureIdentityResponse(BaseModel):
 
     class Config:
         from_attributes = True
-        populate_by_name = True
 
 
 class TimelineStatusResponse(BaseModel):
@@ -44,9 +43,6 @@ class TimelineStatusResponse(BaseModel):
     trajectory: Literal["accelerating", "steady", "stalled"]
     breakthrough_age: int = Field(..., alias="breakthroughAge")
     recent_milestones: List[dict] = Field(default_factory=list, description="Recent learning accelerations", alias="recentMilestones")
-
-    class Config:
-        populate_by_name = True
 
 
 class TimelineUpdateData(BaseModel):
@@ -95,7 +91,6 @@ class CompressionEventResponse(BaseModel):
 
     class Config:
         from_attributes = True
-        populate_by_name = True
 
 
 class RevealedAchievementResponse(BaseModel):
@@ -109,7 +104,6 @@ class RevealedAchievementResponse(BaseModel):
 
     class Config:
         from_attributes = True
-        populate_by_name = True
 
 
 class RevealedAchievementsResponse(BaseModel):
