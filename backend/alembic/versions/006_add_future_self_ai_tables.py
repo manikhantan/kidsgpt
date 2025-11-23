@@ -53,24 +53,12 @@ def upgrade() -> None:
     op.create_index('ix_timeline_events_future_identity_id', 'timeline_events', ['future_identity_id'])
     op.create_index('ix_timeline_events_created_at', 'timeline_events', ['created_at'])
 
-    # Create future_slip_type enum (if it doesn't exist)
-    op.execute("""
-        DO $$ BEGIN
-            CREATE TYPE future_slip_type AS ENUM (
-                'achievement', 'event', 'creation', 'ted_talk',
-                'patent', 'company', 'breakthrough', 'innovation'
-            );
-        EXCEPTION
-            WHEN duplicate_object THEN null;
-        END $$;
-    """)
-
-    # Create future_slips table
+    # Create future_slips table (enum will be auto-created by SQLAlchemy)
     op.create_table(
         'future_slips',
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('future_identity_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('future_identities.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('slip_type', sa.Enum('achievement', 'event', 'creation', 'ted_talk', 'patent', 'company', 'breakthrough', 'innovation', name='future_slip_type'), nullable=False),
+        sa.Column('slip_type', sa.Enum('achievement', 'event', 'creation', 'ted_talk', 'patent', 'company', 'breakthrough', 'innovation', name='future_slip_type', create_type=True), nullable=False),
         sa.Column('content', sa.Text, nullable=False),
         sa.Column('supposed_year', sa.Integer, nullable=False),
         sa.Column('context', sa.Text, nullable=True),
