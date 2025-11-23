@@ -45,6 +45,9 @@ class TimelineStatusResponse(BaseModel):
     breakthrough_age: int = Field(..., alias="breakthroughAge")
     recent_milestones: List[dict] = Field(default_factory=list, description="Recent learning accelerations", alias="recentMilestones")
 
+    class Config:
+        populate_by_name = True
+
 
 class TimelineUpdateData(BaseModel):
     """Schema for timeline update data in chat response."""
