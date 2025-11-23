@@ -12,7 +12,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.config import get_settings
-from app.api.v1 import auth, parent, kid
+from app.api.v1 import auth, parent, kid, future_self
 
 # Configure logging
 logging.basicConfig(
@@ -118,6 +118,7 @@ async def health_check():
 app.include_router(auth.router, prefix="/api")
 app.include_router(parent.router, prefix="/api")
 app.include_router(kid.router, prefix="/api")
+app.include_router(future_self.router, prefix="/api")
 
 
 # Startup and shutdown events

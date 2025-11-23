@@ -35,6 +35,20 @@ from app.schemas.message import (
     ChatSessionResponse,
     ChatHistoryResponse,
 )
+from app.schemas.future_self import (
+    FutureIdentityRequest,
+    FutureIdentityResponse,
+    TimelineStatusResponse,
+    TimelineUpdateData,
+    FutureSlipData,
+    FutureModeChatResponse,
+    CompressionEventRequest,
+    CompressionEventResponse,
+    RevealedAchievementResponse,
+    RevealedAchievementsResponse,
+    TimelineRecalculateRequest,
+    TimelineRecalculateResponse,
+)
 
 __all__ = [
     # Auth
@@ -64,4 +78,17 @@ __all__ = [
     "ChatResponse",
     "ChatSessionResponse",
     "ChatHistoryResponse",
+    # Future Self
+    "FutureIdentityRequest",
+    "FutureIdentityResponse",
+    "TimelineStatusResponse",
+    "TimelineUpdateData",
+    "FutureSlipData",
+    "FutureModeChatResponse",
+    "CompressionEventRequest",
+    "CompressionEventResponse",
+    "RevealedAchievementResponse",
+    "RevealedAchievementsResponse",
+    "TimelineRecalculateRequest",
+    "TimelineRecalculateResponse",
 ]

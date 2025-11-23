@@ -4,8 +4,11 @@ Message and chat session schemas for request/response validation.
 from pydantic import BaseModel, Field
 from datetime import datetime
 from uuid import UUID
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from app.models.message import MessageRole
+
+if TYPE_CHECKING:
+    from app.schemas.future_self import TimelineUpdateData, FutureSlipData
 
 
 class ChatMessageRequest(BaseModel):
@@ -46,6 +49,9 @@ class ChatResponse(BaseModel):
     session_id: Optional[UUID] = Field(None, description="The session this message belongs to")
     session_title: Optional[str] = Field(None, description="AI-generated title for the session")
     video_suggestion: Optional[YouTubeVideoSuggestion] = Field(None, description="Educational YouTube video suggestion")
+    # Future Self AI mode fields
+    timeline_update: Optional[dict] = Field(None, description="Timeline compression update (Future Self AI mode only)")
+    future_slip: Optional[dict] = Field(None, description="Accidental future revelation (Future Self AI mode only)")
 
 
 class ChatSessionSummary(BaseModel):

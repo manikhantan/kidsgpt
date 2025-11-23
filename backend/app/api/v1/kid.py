@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.api.deps import get_db, get_current_kid
-from app.models import Child, ContentRule, ChatSession, Message, MessageRole
+from app.models import Child, ContentRule, ChatSession, Message, MessageRole, FutureIdentity, TimelineEvent, FutureSlip
 from app.schemas.message import (
     ChatMessageRequest,
     ChatResponse,
@@ -25,10 +25,12 @@ from app.schemas.message import (
     CreateChatSessionResponse,
     YouTubeVideoSuggestion,
 )
+from app.schemas.future_self import TimelineUpdateData, FutureSlipData
 from app.services.content_filter import filter_message
 from app.services.ai_service import get_ai_response, get_ai_response_stream, AIService, generate_session_title
 from app.services.insights_service import process_message_for_insights
 from app.services.youtube_service import get_video_suggestion, get_video_suggestion_sync
+from app.services.future_self_service import FutureSelfService
 from app.core.exceptions import NotFoundError, AuthorizationError
 
 router = APIRouter(prefix="/kid", tags=["kid"])
@@ -142,8 +144,28 @@ async def send_chat_message(
         session_messages[:-1]  # Exclude current message as it will be added by AI service
     )
 
-    # Get AI response
-    ai_response_text = get_ai_response(data.message, conversation_history)
+    # Check if user has Future Self AI mode enabled
+    future_identity = db.query(FutureIdentity).filter(
+        FutureIdentity.child_id == kid.id
+    ).first()
+
+    custom_system_prompt = None
+    timeline_update_data = None
+    future_slip_data = None
+
+    if future_identity:
+        # Future Self AI mode is enabled
+        future_service = FutureSelfService()
+
+        # Generate custom system prompt for future mode
+        custom_system_prompt = future_service.generate_future_mode_system_prompt(
+            kid.name,
+            future_identity,
+            db
+        )
+
+    # Get AI response (with custom prompt if in future mode)
+    ai_response_text = get_ai_response(data.message, conversation_history, custom_system_prompt)
 
     # Save AI response
     assistant_message = Message(
@@ -175,6 +197,101 @@ async def send_chat_message(
     db.commit()
     db.refresh(assistant_message)
 
+    # Process Future Self AI mode post-response logic
+    if future_identity:
+        try:
+            future_service = FutureSelfService()
+
+            # Calculate complexity score for the message
+            complexity_score = future_service.calculate_complexity_score(data.message, db)
+
+            # Calculate timeline compression
+            years_compressed = future_service.calculate_timeline_compression(
+                future_identity.current_age,
+                complexity_score,
+                understanding_speed=1.0  # Could be enhanced based on response time
+            )
+
+            # Only create timeline event if meaningful compression occurred
+            if years_compressed > 0.1:
+                # Extract concepts from message
+                concepts = future_service.extract_concepts_from_message(data.message, db)
+                concept_learned = concepts[0] if concepts else "general topic"
+
+                normal_learning_age = future_service.estimate_normal_learning_age(complexity_score)
+
+                # Create timeline event
+                timeline_event = TimelineEvent(
+                    future_identity_id=future_identity.id,
+                    concept_learned=concept_learned,
+                    normal_learning_age=normal_learning_age,
+                    actual_age=future_identity.current_age,
+                    years_compressed=years_compressed,
+                    complexity_score=complexity_score,
+                    context=data.message[:200],
+                    session_id=current_session.id
+                )
+                db.add(timeline_event)
+
+                # Update future identity metrics
+                new_thinking_age = future_service.update_thinking_age(
+                    future_identity,
+                    years_compressed,
+                    db
+                )
+                future_identity.thinking_age = new_thinking_age
+                future_identity.timeline_compression += years_compressed
+                future_identity.trajectory = future_service.calculate_trajectory(future_identity, db)
+
+                # Prepare timeline update data for response
+                timeline_update_data = TimelineUpdateData(
+                    years_compressed=years_compressed,
+                    new_thinking_age=new_thinking_age,
+                    concepts_accelerated=concepts
+                )
+
+            # Check if should generate future slip (5% chance)
+            if future_service.should_generate_future_slip():
+                slip = future_service.generate_future_slip(
+                    future_identity,
+                    data.message,
+                    db
+                )
+                if slip:
+                    # Create future slip record
+                    future_slip = FutureSlip(
+                        future_identity_id=future_identity.id,
+                        slip_type=slip["type"],
+                        content=slip["content"],
+                        supposed_year=slip["supposed_year"],
+                        context=data.message[:200],
+                        session_id=current_session.id,
+                        message_id=assistant_message.id
+                    )
+                    db.add(future_slip)
+
+                    # Prepare future slip data for response
+                    future_slip_data = FutureSlipData(
+                        type=slip["type"],
+                        content=slip["content"],
+                        year_it_happens=slip["supposed_year"]
+                    )
+
+                    # Add to revealed achievements in future identity
+                    revealed = future_identity.revealed_achievements or []
+                    revealed.append({
+                        "content": slip["content"],
+                        "year": slip["supposed_year"]
+                    })
+                    future_identity.revealed_achievements = revealed
+
+            db.commit()
+
+        except Exception as e:
+            # Don't fail the chat response if future mode processing fails
+            import logging
+            logging.error(f"Error processing future mode: {e}")
+
     # Process message for insights (async-friendly, non-blocking)
     try:
         process_message_for_insights(db, user_message, assistant_message)
@@ -199,7 +316,9 @@ async def send_chat_message(
         block_reason=None,
         session_id=current_session.id,
         session_title=session_title,
-        video_suggestion=video_suggestion
+        video_suggestion=video_suggestion,
+        timeline_update=timeline_update_data.model_dump() if timeline_update_data else None,
+        future_slip=future_slip_data.model_dump() if future_slip_data else None
     )
 
 
