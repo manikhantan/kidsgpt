@@ -30,6 +30,32 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/kid", tags=["future-self"])
 
 
+@router.get(
+    "/future-identity",
+    response_model=FutureIdentityResponse,
+    summary="Get user's future identity profile",
+    description="Retrieve the user's future identity profile if it exists."
+)
+async def get_future_identity(
+    kid: Child = Depends(get_current_kid),
+    db: Session = Depends(get_db)
+) -> FutureIdentityResponse:
+    """
+    Get user's future identity profile.
+
+    Returns:
+        Future identity profile or 404 if not found
+    """
+    future_identity = db.query(FutureIdentity).filter(
+        FutureIdentity.child_id == kid.id
+    ).first()
+
+    if not future_identity:
+        raise NotFoundError("Future identity not found. Set up your future profile first.")
+
+    return future_identity
+
+
 @router.post(
     "/future-identity",
     response_model=FutureIdentityResponse,
