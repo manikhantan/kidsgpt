@@ -53,7 +53,7 @@ async def get_future_identity(
     if not future_identity:
         raise NotFoundError("Future identity not found. Set up your future profile first.")
 
-    return FutureIdentityResponse.model_validate(future_identity)
+    return future_identity
 
 
 @router.post(
@@ -110,7 +110,7 @@ async def create_future_identity(
 
     logger.info(f"Created future identity for child {kid.id}: {data.future_identity}")
 
-    return FutureIdentityResponse.model_validate(future_identity)
+    return future_identity
 
 
 @router.get(
@@ -218,7 +218,7 @@ async def create_compression_event(
 
     logger.info(f"Created compression event for child {kid.id}: {data.concept_learned} ({data.years_compressed} years)")
 
-    return CompressionEventResponse.model_validate(event)
+    return event
 
 
 @router.get(
