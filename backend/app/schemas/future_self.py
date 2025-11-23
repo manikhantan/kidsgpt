@@ -32,6 +32,7 @@ class FutureIdentityResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        populate_by_name = True  # Allow reading from ORM snake_case attributes
 
 
 class TimelineStatusResponse(BaseModel):
@@ -43,6 +44,9 @@ class TimelineStatusResponse(BaseModel):
     trajectory: Literal["accelerating", "steady", "stalled"]
     breakthrough_age: int = Field(..., alias="breakthroughAge")
     recent_milestones: List[dict] = Field(default_factory=list, description="Recent learning accelerations", alias="recentMilestones")
+
+    class Config:
+        populate_by_name = True  # Allow reading from mixed sources
 
 
 class TimelineUpdateData(BaseModel):
@@ -91,6 +95,7 @@ class CompressionEventResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        populate_by_name = True  # Allow reading from ORM snake_case attributes
 
 
 class RevealedAchievementResponse(BaseModel):
@@ -104,6 +109,7 @@ class RevealedAchievementResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        populate_by_name = True  # Allow reading from ORM snake_case attributes
 
 
 class RevealedAchievementsResponse(BaseModel):
@@ -123,3 +129,6 @@ class TimelineRecalculateResponse(BaseModel):
     trajectory: str
     events_analyzed: int = Field(..., alias="eventsAnalyzed")
     concepts_identified: int = Field(..., alias="conceptsIdentified")
+
+    class Config:
+        populate_by_name = True  # Allow reading from dict with snake_case keys
