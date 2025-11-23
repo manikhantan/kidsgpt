@@ -53,12 +53,16 @@ def upgrade() -> None:
     op.create_index('ix_timeline_events_future_identity_id', 'timeline_events', ['future_identity_id'])
     op.create_index('ix_timeline_events_created_at', 'timeline_events', ['created_at'])
 
-    # Create future_slip_type enum
+    # Create future_slip_type enum (if it doesn't exist)
     op.execute("""
-        CREATE TYPE future_slip_type AS ENUM (
-            'achievement', 'event', 'creation', 'ted_talk',
-            'patent', 'company', 'breakthrough', 'innovation'
-        )
+        DO $$ BEGIN
+            CREATE TYPE future_slip_type AS ENUM (
+                'achievement', 'event', 'creation', 'ted_talk',
+                'patent', 'company', 'breakthrough', 'innovation'
+            );
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
     """)
 
     # Create future_slips table
