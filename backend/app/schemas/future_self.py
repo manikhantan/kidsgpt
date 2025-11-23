@@ -15,6 +15,9 @@ class FutureIdentityRequest(BaseModel):
     first_ambition: str = Field(..., min_length=1, max_length=500, description="What they want to be known for", alias="firstAmbition")
     current_age: int = Field(..., ge=5, le=18, description="User's current age", alias="currentAge")
 
+    class Config:
+        populate_by_name = True
+
 
 class FutureIdentityResponse(BaseModel):
     """Schema for future identity profile response."""
@@ -76,6 +79,9 @@ class CompressionEventRequest(BaseModel):
     complexity_score: Optional[float] = Field(None, ge=1, le=10, alias="complexityScore")
     context: Optional[str] = None
     session_id: Optional[UUID] = Field(None, alias="sessionId")
+
+    class Config:
+        populate_by_name = True
 
 
 class CompressionEventResponse(BaseModel):
