@@ -10,53 +10,54 @@ from app.models.future_slip import FutureSlipType
 
 class FutureIdentityRequest(BaseModel):
     """Schema for creating a future identity profile."""
-    future_identity: str = Field(..., min_length=1, max_length=100, description="Founder, Creator, Healer, Builder, Discoverer, Changemaker, or custom")
-    breakthrough_age: int = Field(..., ge=14, le=30, description="Age when they achieve their first breakthrough")
-    first_ambition: str = Field(..., min_length=1, max_length=500, description="What they want to be known for")
-    current_age: int = Field(..., ge=5, le=18, description="User's current age")
+    future_identity: str = Field(..., min_length=1, max_length=100, description="Founder, Creator, Healer, Builder, Discoverer, Changemaker, or custom", alias="futureIdentity")
+    breakthrough_age: int = Field(..., ge=14, le=30, description="Age when they achieve their first breakthrough", alias="breakthroughAge")
+    first_ambition: str = Field(..., min_length=1, max_length=500, description="What they want to be known for", alias="firstAmbition")
+    current_age: int = Field(..., ge=5, le=18, description="User's current age", alias="currentAge")
 
 
 class FutureIdentityResponse(BaseModel):
     """Schema for future identity profile response."""
     id: UUID
-    child_id: UUID
-    future_identity: str
-    breakthrough_age: int
-    first_ambition: str
-    timeline_compression: float
-    thinking_age: float
-    current_age: int
+    child_id: UUID = Field(..., alias="childId")
+    future_identity: str = Field(..., alias="futureIdentity")
+    breakthrough_age: int = Field(..., alias="breakthroughAge")
+    first_ambition: str = Field(..., alias="firstAmbition")
+    timeline_compression: float = Field(..., alias="timelineCompression")
+    thinking_age: float = Field(..., alias="thinkingAge")
+    current_age: int = Field(..., alias="currentAge")
     trajectory: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = Field(..., alias="createdAt")
+    updated_at: datetime = Field(..., alias="updatedAt")
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class TimelineStatusResponse(BaseModel):
     """Schema for timeline status response."""
-    future_identity: str
-    current_age: int
-    thinking_age: float
-    timeline_compression: float
+    future_identity: str = Field(..., alias="futureIdentity")
+    current_age: int = Field(..., alias="currentAge")
+    thinking_age: float = Field(..., alias="thinkingAge")
+    timeline_compression: float = Field(..., alias="timelineCompression")
     trajectory: Literal["accelerating", "steady", "stalled"]
-    breakthrough_age: int
-    recent_milestones: List[dict] = Field(default_factory=list, description="Recent learning accelerations")
+    breakthrough_age: int = Field(..., alias="breakthroughAge")
+    recent_milestones: List[dict] = Field(default_factory=list, description="Recent learning accelerations", alias="recentMilestones")
 
 
 class TimelineUpdateData(BaseModel):
     """Schema for timeline update data in chat response."""
-    years_compressed: float = Field(..., description="How many years this conversation saved")
-    new_thinking_age: float
-    concepts_accelerated: List[str] = Field(default_factory=list)
+    years_compressed: float = Field(..., description="How many years this conversation saved", alias="yearsCompressed")
+    new_thinking_age: float = Field(..., alias="newThinkingAge")
+    concepts_accelerated: List[str] = Field(default_factory=list, alias="conceptsAccelerated")
 
 
 class FutureSlipData(BaseModel):
     """Schema for future slip data in chat response."""
     type: FutureSlipType
     content: str
-    year_it_happens: int
+    year_it_happens: int = Field(..., alias="yearItHappens")
 
 
 class FutureModeChatResponse(BaseModel):
@@ -68,29 +69,30 @@ class FutureModeChatResponse(BaseModel):
 
 class CompressionEventRequest(BaseModel):
     """Schema for logging a compression event."""
-    concept_learned: str = Field(..., min_length=1, max_length=200)
-    normal_learning_age: int = Field(..., ge=5, le=50)
-    actual_age: int = Field(..., ge=5, le=18)
-    years_compressed: float = Field(..., ge=0)
-    complexity_score: Optional[float] = Field(None, ge=1, le=10)
+    concept_learned: str = Field(..., min_length=1, max_length=200, alias="conceptLearned")
+    normal_learning_age: int = Field(..., ge=5, le=50, alias="normalLearningAge")
+    actual_age: int = Field(..., ge=5, le=18, alias="actualAge")
+    years_compressed: float = Field(..., ge=0, alias="yearsCompressed")
+    complexity_score: Optional[float] = Field(None, ge=1, le=10, alias="complexityScore")
     context: Optional[str] = None
-    session_id: Optional[UUID] = None
+    session_id: Optional[UUID] = Field(None, alias="sessionId")
 
 
 class CompressionEventResponse(BaseModel):
     """Schema for compression event response."""
     id: UUID
-    future_identity_id: UUID
-    concept_learned: str
-    normal_learning_age: int
-    actual_age: int
-    years_compressed: float
-    complexity_score: Optional[float]
+    future_identity_id: UUID = Field(..., alias="futureIdentityId")
+    concept_learned: str = Field(..., alias="conceptLearned")
+    normal_learning_age: int = Field(..., alias="normalLearningAge")
+    actual_age: int = Field(..., alias="actualAge")
+    years_compressed: float = Field(..., alias="yearsCompressed")
+    complexity_score: Optional[float] = Field(None, alias="complexityScore")
     context: Optional[str]
-    created_at: datetime
+    created_at: datetime = Field(..., alias="createdAt")
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class RevealedAchievementResponse(BaseModel):
@@ -98,12 +100,13 @@ class RevealedAchievementResponse(BaseModel):
     id: UUID
     type: FutureSlipType
     content: str
-    revealed_at: datetime
-    supposed_year: int
+    revealed_at: datetime = Field(..., alias="revealedAt")
+    supposed_year: int = Field(..., alias="supposedYear")
     context: Optional[str]
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class RevealedAchievementsResponse(BaseModel):
@@ -118,8 +121,8 @@ class TimelineRecalculateRequest(BaseModel):
 
 class TimelineRecalculateResponse(BaseModel):
     """Schema for timeline recalculation response."""
-    timeline_compression: float
-    thinking_age: float
+    timeline_compression: float = Field(..., alias="timelineCompression")
+    thinking_age: float = Field(..., alias="thinkingAge")
     trajectory: str
-    events_analyzed: int
-    concepts_identified: int
+    events_analyzed: int = Field(..., alias="eventsAnalyzed")
+    concepts_identified: int = Field(..., alias="conceptsIdentified")
