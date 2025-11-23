@@ -10,13 +10,10 @@ from app.models.future_slip import FutureSlipType
 
 class FutureIdentityRequest(BaseModel):
     """Schema for creating a future identity profile."""
-    future_identity: str = Field(..., min_length=1, max_length=100, description="Founder, Creator, Healer, Builder, Discoverer, Changemaker, or custom", alias="futureIdentity")
+    future_identity: str = Field(..., min_length=1, max_length=100, description="Founder, Creator, Healer, Builder, Discoverer, Changemaker, or custom", alias="type")
     breakthrough_age: int = Field(..., ge=14, le=30, description="Age when they achieve their first breakthrough", alias="breakthroughAge")
-    first_ambition: str = Field(..., min_length=1, max_length=500, description="What they want to be known for", alias="firstAmbition")
+    first_ambition: str = Field(..., min_length=1, max_length=500, description="What they want to be known for", alias="ambition")
     current_age: int = Field(..., ge=5, le=18, description="User's current age", alias="currentAge")
-
-    class Config:
-        populate_by_name = True
 
 
 class FutureIdentityResponse(BaseModel):
@@ -79,9 +76,6 @@ class CompressionEventRequest(BaseModel):
     complexity_score: Optional[float] = Field(None, ge=1, le=10, alias="complexityScore")
     context: Optional[str] = None
     session_id: Optional[UUID] = Field(None, alias="sessionId")
-
-    class Config:
-        populate_by_name = True
 
 
 class CompressionEventResponse(BaseModel):
